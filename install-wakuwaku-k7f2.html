@@ -1,0 +1,59 @@
+<!doctype html><html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>note分析ツール インストール</title>
+<style>
+body{font:15px/1.8 -apple-system,"Hiragino Kaku Gothic ProN",Meiryo,sans-serif;color:#222;max-width:720px;margin:30px auto;padding:0 18px}
+h1{font-size:22px}
+.btn{display:inline-block;background:#2E5AAC;color:#fff;padding:12px 22px;border-radius:10px;text-decoration:none;font-weight:700;font-size:16px;box-shadow:0 3px 10px rgba(46,90,172,.35)}
+.step{background:#f5f7fb;border-radius:12px;padding:16px 20px;margin:14px 0}
+.num{display:inline-block;background:#2E5AAC;color:#fff;width:26px;height:26px;border-radius:50%;text-align:center;line-height:26px;font-weight:700;margin-right:8px}
+code{background:#eef;padding:2px 6px;border-radius:5px}
+.note{color:#888;font-size:13px}
+</style></head><body>
+<h1>📊 note分析ツール（インストール不要）</h1>
+<p>下のボタンを<b>ブックマークバーにドラッグ＆ドロップ</b>するだけ。あとはnoteを開いて押せば、レポートが自動でダウンロードされます。Pythonもインストールも不要です。<br><b>ツールは自動で最新版にアップデート</b>されるので、一度登録すれば入れ直しは不要です。</p>
+
+<div class="step"><span class="num">1</span><b>ボタンをブックマークバーにドラッグ</b><br>
+<p style="margin:14px 0 4px"><a class="btn" href="javascript:%2F*%20note%20%E3%82%8F%E3%81%8F%E3%82%8F%E3%81%8F%E5%88%86%E6%9E%90%E3%83%AC%E3%83%9D%E3%83%BC%E3%83%88%20%E2%80%94%20%E3%83%AD%E3%83%BC%E3%83%80%E3%83%BC%EF%BC%88%E3%81%93%E3%81%AE%E4%B8%AD%E8%BA%AB%E3%81%8C%E3%83%96%E3%83%83%E3%82%AF%E3%83%9E%E3%83%BC%E3%82%AF%E3%81%AB%E3%81%AA%E3%82%8B%EF%BC%89%0A%20%20%20BASE%20%E3%81%A0%E3%81%91%E3%82%92%E8%87%AA%E5%88%86%E3%81%AEGitHub%20Pages%E3%81%AEURL%E3%81%AB%E5%A4%89%E3%81%88%E3%81%A6%E4%BD%BF%E3%81%86%E3%80%82%20*%2F%0A(function%20()%20%7B%0A%20%20var%20BASE%20%3D%20%22https%3A%2F%2Favakero.github.io%2Fnote-report%2F%22%3B%20%2F*%20%E7%A2%BA%E5%AE%9A%E6%B8%88%E3%81%BFURL%EF%BC%88%E6%9C%AB%E5%B0%BE%E3%82%B9%E3%83%A9%E3%83%83%E3%82%B7%E3%83%A5%E5%BF%85%E9%A0%88%EF%BC%89%20*%2F%0A%20%20if%20(window.__noteToolLoading)%20return%3B%0A%20%20window.__noteToolLoading%20%3D%20true%3B%0A%20%20window.__NOTE_BASE%20%3D%20BASE%3B%0A%20%20var%20s%20%3D%20document.createElement(%22script%22)%3B%0A%20%20s.src%20%3D%20BASE%20%2B%20%22note-tool.js%3Ft%3D%22%20%2B%20Date.now()%3B%0A%20%20s.onload%20%3D%20function%20()%20%7B%20window.__noteToolLoading%20%3D%20false%3B%20%7D%3B%0A%20%20s.onerror%20%3D%20function%20()%20%7B%0A%20%20%20%20window.__noteToolLoading%20%3D%20false%3B%0A%20%20%20%20alert(%22%E3%83%84%E3%83%BC%E3%83%AB%E3%81%AE%E8%AA%AD%E3%81%BF%E8%BE%BC%E3%81%BF%E3%81%AB%E5%A4%B1%E6%95%97%E3%81%97%E3%81%BE%E3%81%97%E3%81%9F%E3%80%82%E9%80%9A%E4%BF%A1%E7%92%B0%E5%A2%83%E3%82%92%E7%A2%BA%E8%AA%8D%E3%81%97%E3%81%A6%E3%80%81%E3%82%82%E3%81%86%E4%B8%80%E5%BA%A6%E3%81%8A%E8%A9%A6%E3%81%97%E3%81%8F%E3%81%A0%E3%81%95%E3%81%84%E3%80%82%22)%3B%0A%20%20%7D%3B%0A%20%20(document.body%20%7C%7C%20document.documentElement).appendChild(s)%3B%0A%7D)()%3B%0Avoid%200%3B">📊 note分析</a></p>
+<span class="note">※クリックではなく、ボタンをつまんでブラウザ上部のブックマークバーへ運んでください。ブックマークバーが出ていない場合は Ctrl+Shift+B（Macは ⌘+Shift+B）で表示。</span></div>
+
+<div class="step"><span class="num">2</span><b>noteにログインした状態で、自分のページを開く</b><br>
+<span class="note">例：https://note.com/kyosuke_create ／ どのnoteページでもOK。ログインしていればPV(閲覧数)も自動で取得します。</span></div>
+
+<div class="step"><span class="num">3</span><b>ブックマークバーの「📊 note分析」を押す</b><br>
+右上に進捗が出て、数十秒後に <code>note_report_*.html</code> がダウンロードされます。それを開けばレポート完成。</div>
+
+<div class="step"><b>💡 うまく登録できない / 押しても動かないとき</b>
+<p style="margin:8px 0 0">まれにブラウザがブックマーク登録を拒むことがあります。その場合は次の方法でも動きます。</p>
+<p style="margin:6px 0 0;color:#444">noteを開く → キーボードの <b>F12</b> → 「Console（コンソール）」タブ → 下のコードを全部コピーして貼り付けて Enter。<br><span style="color:#888">※初回はChromeが「allow pasting」と入力を求めることがあります。</span></p>
+<textarea readonly onclick="this.select()" style="width:100%;height:90px;margin-top:8px;font:12px/1.5 Consolas,monospace;color:#555;border:1px solid #ccd;border-radius:8px;padding:8px;box-sizing:border-box">(function () {
+  var BASE = "https://avakero.github.io/note-report/";
+  if (window.__noteToolLoading) return;
+  window.__noteToolLoading = true;
+  window.__NOTE_BASE = BASE;
+  var s = document.createElement("script");
+  s.src = BASE + "note-tool.js?t=" + Date.now();
+  s.onload = function () { window.__noteToolLoading = false; };
+  s.onerror = function () {
+    window.__noteToolLoading = false;
+    alert("ツールの読み込みに失敗しました。通信環境を確認して、もう一度お試しください。");
+  };
+  (document.body || document.documentElement).appendChild(s);
+})();</textarea></div>
+<h2>レポートに入るもの</h2>
+<p>合計PV・スキ・コメント・<b>スキ率</b>／スキの時間帯・曜日ヒートマップ／記事別エンゲージ／スキ率ランキング（刺さり度）／常連ファン／<b>見込みフォロワー（未フォローのスキ主・活動時間帯・プロフィールURLつき）</b>／ハッシュタグ別平均スキ。<br>さらにレポート末尾に<b>「🤖 AIに相談」</b>セクションが付き、あなたの数字入りの相談文をコピーして、ChatGPT/Claude/Geminiなど好きな無料AIに貼るだけで改善アドバイスがもらえます（APIキー不要）。</p>
+
+<div class="step"><b>🛡 安全・サーバーへの配慮（自動）</b>
+<p style="margin:10px 0 0">このツールはnoteに負担をかけないよう、次の安全装置を内蔵しています。</p>
+<ul style="margin:8px 0 0;padding-left:20px;color:#444">
+<li><b>規模に応じた自動速度調整</b>：記事数・フォロワー数から取得量を見積もり、大きいアカウントほど間隔を広げて丁寧に取得します（実行前に「推定◯秒」を表示）。</li>
+<li><b>連続実行ガード</b>：前回実行から約10分以内にもう一度押すと、確認メッセージが出ます（連打防止）。</li>
+<li><b>混雑時は自動で待機／停止</b>：noteが混み合う信号（429）を受けたら自動で待って再試行。それでも続く場合は安全に停止し、「数分おいて再実行」を案内します。</li>
+<li><b>総リクエスト上限</b>：1回の取得が暴走しないよう上限を設けています。</li>
+</ul>
+<p style="margin:8px 0 0;color:#888;font-size:13px">目安：小規模なら約10〜20秒。実行は1日に数回まで、短時間の連続実行は避けてください。より丁寧にしたい場合はソースの <code>opts.delay</code>／初期 <code>DELAY</code> を大きくできます。</p></div>
+<p class="note">・note公式ではなく非公式APIを利用しています。仕様変更で動かなくなる可能性があります。<br>
+・自分のログイン情報で自分のデータを見るだけで、どこにも送信しません（PC内でHTMLを作るだけ）。<br>
+・コメントは件数のみ（誰がコメントしたかはnoteの新方式により現状未対応）。</p>
+</body></html>

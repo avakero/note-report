@@ -1,0 +1,288 @@
+<!doctype html><html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>【テスト版】note わくわく分析レポート｜かんたん設置ガイド</title>
+<style>
+:root{
+  --green:#3d9b63; --green-dark:#2e7a4d; --green-pale:#e8f5ee;
+  --ink:#333; --sub:#777; --cream:#fdfbf5; --card:#ffffff;
+  --line:#e5e0d5; --accent:#e8618c;
+}
+*{box-sizing:border-box}
+body{font:16px/1.9 -apple-system,"Hiragino Kaku Gothic ProN","Yu Gothic UI",Meiryo,sans-serif;
+  color:var(--ink);background:var(--cream);margin:0;padding:0}
+.wrap{max-width:680px;margin:0 auto;padding:24px 18px 60px}
+
+/* ヘッダー */
+.hero{text-align:center;padding:28px 10px 8px}
+.hero img{width:150px;max-width:40%;height:auto}
+h1{font-size:26px;margin:10px 0 6px;color:var(--green-dark)}
+.hero .lead{color:var(--sub);font-size:15px;margin:0}
+.badge-row{margin:14px 0 0}
+.badge{display:inline-block;background:var(--green-pale);color:var(--green-dark);
+  border-radius:999px;padding:4px 14px;font-size:13px;font-weight:700;margin:3px}
+
+/* スマホ警告（タッチ端末のみ表示） */
+.sp-alert{display:none;background:#fff3cd;border:2px solid #f0c36d;border-radius:14px;
+  padding:16px 18px;margin:20px 0;font-size:15px}
+.sp-alert b{color:#8a6100}
+@media (hover:none) and (pointer:coarse){.sp-alert{display:block}}
+
+/* セクション */
+h2{font-size:20px;color:var(--green-dark);margin:44px 0 6px;padding-left:12px;
+  border-left:5px solid var(--green);line-height:1.5}
+.h2sub{color:var(--sub);font-size:14px;margin:0 0 16px;padding-left:17px}
+
+/* ステップカード */
+.step{background:var(--card);border:1px solid var(--line);border-radius:16px;
+  padding:20px 22px;margin:16px 0;box-shadow:0 2px 8px rgba(90,80,60,.06)}
+.step-head{display:flex;align-items:center;gap:12px;margin-bottom:6px}
+.num{flex:none;background:var(--green);color:#fff;width:34px;height:34px;border-radius:50%;
+  text-align:center;line-height:34px;font-weight:800;font-size:17px}
+.step-head b{font-size:17px}
+.step p{margin:8px 0}
+.hint{background:var(--green-pale);border-radius:10px;padding:10px 14px;font-size:14px;margin:12px 0 0}
+.hint b{color:var(--green-dark)}
+kbd{background:#fff;border:1px solid #ccc;border-bottom-width:3px;border-radius:6px;
+  padding:2px 8px;font-family:inherit;font-size:14px;font-weight:700;white-space:nowrap}
+
+/* ブラウザ図解 */
+.browser{border:2px solid #d8d2c4;border-radius:12px;overflow:hidden;margin:14px 0;background:#fff;font-size:13px}
+.browser .bar{background:#f1efe9;padding:8px 12px;display:flex;align-items:center;gap:8px;border-bottom:1px solid #e2ddd0}
+.browser .dot{width:10px;height:10px;border-radius:50%;background:#d5cfc0}
+.browser .url{flex:1;background:#fff;border:1px solid #ddd;border-radius:999px;padding:2px 12px;color:#aaa}
+.browser .bmbar{background:#fffbe6;border:2px dashed var(--accent);margin:6px;border-radius:8px;
+  padding:7px 12px;color:#b3466b;font-weight:700}
+.browser .body{padding:16px 12px 20px;text-align:center;color:#bbb}
+.drag-arrow{text-align:center;font-size:15px;color:var(--accent);font-weight:700;margin:4px 0}
+
+/* ボタン */
+.btn-area{text-align:center;padding:6px 0 2px}
+.btn{display:inline-block;background:linear-gradient(180deg,#4aad72,#3d9b63);color:#fff;
+  padding:16px 34px;border-radius:14px;text-decoration:none;font-weight:800;font-size:19px;
+  box-shadow:0 4px 14px rgba(61,155,99,.4);cursor:grab}
+.btn:active{cursor:grabbing}
+.btn-caption{font-size:13px;color:var(--sub);margin-top:8px}
+
+/* スマホ用ガイド */
+.copy-btn{display:block;margin:10px auto 0;background:linear-gradient(180deg,#4aad72,#3d9b63);
+  color:#fff;border:0;border-radius:12px;padding:13px 26px;font-size:16px;font-weight:800;
+  cursor:pointer;box-shadow:0 3px 10px rgba(61,155,99,.35)}
+details.os summary::before{content:none}
+details.os summary{font-size:16px}
+
+/* できることリスト */
+.feature{display:flex;gap:10px;background:var(--card);border:1px solid var(--line);
+  border-radius:12px;padding:12px 16px;margin:10px 0;font-size:15px}
+.feature .ic{flex:none;font-size:20px}
+.feature b{color:var(--green-dark)}
+
+/* Q&A */
+details{background:var(--card);border:1px solid var(--line);border-radius:12px;
+  padding:0;margin:10px 0;overflow:hidden}
+summary{cursor:pointer;padding:14px 18px;font-weight:700;font-size:15px;list-style:none;position:relative}
+summary::before{content:"Q";display:inline-block;background:var(--green);color:#fff;border-radius:8px;
+  width:24px;height:24px;text-align:center;line-height:24px;font-size:13px;margin-right:10px}
+summary::after{content:"＋";position:absolute;right:16px;color:var(--sub)}
+details[open] summary::after{content:"－"}
+.a{padding:0 18px 16px;font-size:15px;color:#444}
+.a p{margin:6px 0}
+textarea.code{width:100%;height:100px;font:12px/1.5 Consolas,monospace;color:#555;
+  border:1px solid var(--line);border-radius:10px;padding:10px;background:#fafaf6}
+
+/* 注意書き */
+.notes{background:#f6f4ec;border-radius:14px;padding:18px 20px;font-size:13.5px;color:#666;margin-top:36px}
+.notes li{margin:4px 0}
+.footer{text-align:center;color:#aaa;font-size:12px;margin-top:30px}
+</style></head><body>
+<div class="wrap"><div style="background:#ffe9d6;border:2px solid #f0a35e;border-radius:14px;padding:12px 16px;margin:16px 0 0;font-size:14px;color:#8a4b00;text-align:center">🧪 <b>テスト版ページです</b>（スマホ対応の動作確認用。本番のボタンには影響しません）</div>
+
+<div class="hero">
+  <img src="data:image/png;base64,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" alt="あばけろ君">
+  <h1>📊 note わくわく分析レポート</h1>
+  <p class="lead">あなたのnoteを丸ごと分析して、1枚のレポートにします</p>
+  <div class="badge-row">
+    <span class="badge">インストール不要</span><span class="badge">無料</span><span class="badge">設置は1回だけ</span><span class="badge">自動で最新版に更新</span>
+  </div>
+</div>
+
+<div class="sp-alert">📱 <b>いまスマホで見ていますか？</b><br>
+スマホでもそのまま使えます！ 設置のやり方が少しちがうので、<a href="#sp-guide" style="color:#8a6100;font-weight:700">下の「スマホで使う」の手順</a>に進んでください。（パソコンをお持ちの方は、パソコンのほうがかんたんです）</div>
+
+<h2>じゅんび：ブックマークバーを出す</h2>
+<p class="h2sub">最初の1回だけ。もう表示されている人は飛ばしてOK！</p>
+<div class="step">
+  <p>「ブックマークバー」とは、ブラウザの上のほう（アドレスバーのすぐ下）にある、<b>お気に入りのページが横に並ぶ細長いエリア</b>のことです。</p>
+  <div class="browser">
+    <div class="bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url">https://…</span></div>
+    <div class="bmbar">⭐ ここがブックマークバー（お気に入りが並ぶ場所）</div>
+    <div class="body">ページの中身</div>
+  </div>
+  <p>見あたらない場合は、キーボードで次のキーを同時に押すと出てきます👇</p>
+  <p style="text-align:center;margin:12px 0"><kbd>Ctrl</kbd> ＋ <kbd>Shift</kbd> ＋ <kbd>B</kbd>　<span style="color:var(--sub);font-size:14px">（Macは <kbd>⌘</kbd> ＋ <kbd>Shift</kbd> ＋ <kbd>B</kbd>）</span></p>
+  <div class="hint">💡 Chrome・Edgeどちらも同じキーです。もう一度押すと消えるので、間違えて消してしまってもあわてずもう一度。</div>
+</div>
+
+<h2>設置してみよう（3ステップ）</h2>
+<p class="h2sub">ぜんぶで1〜2分。むずかしい操作はありません🐸</p>
+
+<div class="step">
+  <div class="step-head"><span class="num">1</span><b>下の緑のボタンを、ブックマークバーへドラッグ</b></div>
+  <p>ボタンの上でマウスの<b>左ボタンを押したまま</b>、上のブックマークバーまで運んで、<b>指を離す</b>だけ。（※クリックしても何も起きません。「つまんで運ぶ」のがコツです）</p>
+  <div class="drag-arrow">⭐ ブックマークバーへ　⬆ つまんで運ぶ</div>
+  <div class="btn-area">
+    <a class="btn" href="javascript:%2F*%20note%20%E3%82%8F%E3%81%8F%E3%82%8F%E3%81%8F%E5%88%86%E6%9E%90%E3%83%AC%E3%83%9D%E3%83%BC%E3%83%88%20%E2%80%94%20%E3%83%AD%E3%83%BC%E3%83%80%E3%83%BC%EF%BC%88%E3%81%93%E3%81%AE%E4%B8%AD%E8%BA%AB%E3%81%8C%E3%83%96%E3%83%83%E3%82%AF%E3%83%9E%E3%83%BC%E3%82%AF%E3%81%AB%E3%81%AA%E3%82%8B%EF%BC%89%0A%20%20%20BASE%20%E3%81%A0%E3%81%91%E3%82%92%E8%87%AA%E5%88%86%E3%81%AEGitHub%20Pages%E3%81%AEURL%E3%81%AB%E5%A4%89%E3%81%88%E3%81%A6%E4%BD%BF%E3%81%86%E3%80%82%20*%2F%0A(function%20()%20%7B%0A%20%20var%20BASE%20%3D%20%22https%3A%2F%2Favakero.github.io%2Fnote-report%2F%22%3B%20%2F*%20%E7%A2%BA%E5%AE%9A%E6%B8%88%E3%81%BFURL%EF%BC%88%E6%9C%AB%E5%B0%BE%E3%82%B9%E3%83%A9%E3%83%83%E3%82%B7%E3%83%A5%E5%BF%85%E9%A0%88%EF%BC%89%20*%2F%0A%20%20if%20(window.__noteToolLoading)%20return%3B%0A%20%20window.__noteToolLoading%20%3D%20true%3B%0A%20%20window.__NOTE_BASE%20%3D%20BASE%3B%0A%20%20var%20s%20%3D%20document.createElement(%22script%22)%3B%0A%20%20s.src%20%3D%20BASE%20%2B%20%22note-tool-beta.js%3Ft%3D%22%20%2B%20Date.now()%3B%0A%20%20s.onload%20%3D%20function%20()%20%7B%20window.__noteToolLoading%20%3D%20false%3B%20%7D%3B%0A%20%20s.onerror%20%3D%20function%20()%20%7B%0A%20%20%20%20window.__noteToolLoading%20%3D%20false%3B%0A%20%20%20%20alert(%22%E3%83%84%E3%83%BC%E3%83%AB%E3%81%AE%E8%AA%AD%E3%81%BF%E8%BE%BC%E3%81%BF%E3%81%AB%E5%A4%B1%E6%95%97%E3%81%97%E3%81%BE%E3%81%97%E3%81%9F%E3%80%82%E9%80%9A%E4%BF%A1%E7%92%B0%E5%A2%83%E3%82%92%E7%A2%BA%E8%AA%8D%E3%81%97%E3%81%A6%E3%80%81%E3%82%82%E3%81%86%E4%B8%80%E5%BA%A6%E3%81%8A%E8%A9%A6%E3%81%97%E3%81%8F%E3%81%A0%E3%81%95%E3%81%84%E3%80%82%22)%3B%0A%20%20%7D%3B%0A%20%20(document.body%20%7C%7C%20document.documentElement).appendChild(s)%3B%0A%7D)()%3B%0Avoid%200%3B">📊 note分析</a>
+    <div class="btn-caption">このボタンをドラッグ＆ドロップ</div>
+  </div>
+  <div class="hint">✅ ブックマークバーに「<b>📊 note分析</b>」という項目が増えたら成功です！</div>
+</div>
+
+<div class="step">
+  <div class="step-head"><span class="num">2</span><b>noteにログインして、自分のページを開く</b></div>
+  <p>いつもどおり <b>note.com</b> を開いてログインし、自分のページ（どのnoteページでもOK）を表示します。</p>
+  <div class="hint">💡 ログインした状態だと、PV（閲覧数）まで自動で取れます。</div>
+</div>
+
+<div class="step">
+  <div class="step-head"><span class="num">3</span><b>ブックマークバーの「📊 note分析」を押す</b></div>
+  <p>画面の右上に「スキを集めています…」のような進捗が出て、<b>数十秒でレポートが自動ダウンロード</b>されます。</p>
+  <p>ダウンロードされた <b>note_report_〇〇.html</b> というファイルを<b>ダブルクリック</b>すると、ブラウザでレポートが開きます🎉</p>
+</div>
+
+<h2 id="sp-guide">スマホで使う（iPhone・Android）</h2>
+<p class="h2sub">パソコンがなくても大丈夫。「ドラッグ」の代わりに「コピーして貼る」だけです📱</p>
+
+<div class="step">
+  <p style="margin:0"><b>スマホでは、レポートはその場で画面いっぱいに表示されます。</b><br>
+  実行すると全画面でレポートが開き、「💾 保存」ボタンを押せばファイルとしても残せます。パソコンのように「ダウンロードしたファイルを探す」必要はありません。</p>
+</div>
+
+<div class="step">
+  <div class="step-head"><span class="num">1</span><b>まず、下のコードをコピーする</b></div>
+  <p>これが「ブックマークの中身」になります。ボタンひとつでコピーできます👇</p>
+  <textarea class="code" id="bm-code" readonly onclick="this.select()">javascript:%2F*%20note%20%E3%82%8F%E3%81%8F%E3%82%8F%E3%81%8F%E5%88%86%E6%9E%90%E3%83%AC%E3%83%9D%E3%83%BC%E3%83%88%20%E2%80%94%20%E3%83%AD%E3%83%BC%E3%83%80%E3%83%BC%EF%BC%88%E3%81%93%E3%81%AE%E4%B8%AD%E8%BA%AB%E3%81%8C%E3%83%96%E3%83%83%E3%82%AF%E3%83%9E%E3%83%BC%E3%82%AF%E3%81%AB%E3%81%AA%E3%82%8B%EF%BC%89%0A%20%20%20BASE%20%E3%81%A0%E3%81%91%E3%82%92%E8%87%AA%E5%88%86%E3%81%AEGitHub%20Pages%E3%81%AEURL%E3%81%AB%E5%A4%89%E3%81%88%E3%81%A6%E4%BD%BF%E3%81%86%E3%80%82%20*%2F%0A(function%20()%20%7B%0A%20%20var%20BASE%20%3D%20%22https%3A%2F%2Favakero.github.io%2Fnote-report%2F%22%3B%20%2F*%20%E7%A2%BA%E5%AE%9A%E6%B8%88%E3%81%BFURL%EF%BC%88%E6%9C%AB%E5%B0%BE%E3%82%B9%E3%83%A9%E3%83%83%E3%82%B7%E3%83%A5%E5%BF%85%E9%A0%88%EF%BC%89%20*%2F%0A%20%20if%20(window.__noteToolLoading)%20return%3B%0A%20%20window.__noteToolLoading%20%3D%20true%3B%0A%20%20window.__NOTE_BASE%20%3D%20BASE%3B%0A%20%20var%20s%20%3D%20document.createElement(%22script%22)%3B%0A%20%20s.src%20%3D%20BASE%20%2B%20%22note-tool-beta.js%3Ft%3D%22%20%2B%20Date.now()%3B%0A%20%20s.onload%20%3D%20function%20()%20%7B%20window.__noteToolLoading%20%3D%20false%3B%20%7D%3B%0A%20%20s.onerror%20%3D%20function%20()%20%7B%0A%20%20%20%20window.__noteToolLoading%20%3D%20false%3B%0A%20%20%20%20alert(%22%E3%83%84%E3%83%BC%E3%83%AB%E3%81%AE%E8%AA%AD%E3%81%BF%E8%BE%BC%E3%81%BF%E3%81%AB%E5%A4%B1%E6%95%97%E3%81%97%E3%81%BE%E3%81%97%E3%81%9F%E3%80%82%E9%80%9A%E4%BF%A1%E7%92%B0%E5%A2%83%E3%82%92%E7%A2%BA%E8%AA%8D%E3%81%97%E3%81%A6%E3%80%81%E3%82%82%E3%81%86%E4%B8%80%E5%BA%A6%E3%81%8A%E8%A9%A6%E3%81%97%E3%81%8F%E3%81%A0%E3%81%95%E3%81%84%E3%80%82%22)%3B%0A%20%20%7D%3B%0A%20%20(document.body%20%7C%7C%20document.documentElement).appendChild(s)%3B%0A%7D)()%3B%0Avoid%200%3B</textarea>
+  <button class="copy-btn" id="bm-copy" type="button">📋 コードをコピー</button>
+</div>
+
+<div class="step">
+  <div class="step-head"><span class="num">2</span><b>自分のスマホに合わせて設置する</b></div>
+  <p>お使いの機種のほうを押して開いてください👇</p>
+
+  <details class="os"><summary>🍎 iPhone（Safari）のやり方</summary>
+  <div class="a">
+  <p><b>① ブックマークをひとつ作る</b><br>
+  Safariで <b>note.com</b> を開き、下の共有ボタン（□に↑）→「<b>ブックマークを追加</b>」。名前を「<b>note分析</b>」にして保存します。</p>
+  <p><b>② ブックマークの中身を貼り替える</b><br>
+  下の本のマーク（ブックマーク一覧）→ 右下の「<b>編集</b>」→ さっき作った「note分析」をタップ → <b>URLの欄を全部消して</b>、コピーしたコードを貼り付け → 完了。</p>
+  <p><b>③ 実行する</b><br>
+  note.comを開いてログインした状態で、ブックマーク一覧から「<b>note分析</b>」をタップ。レポートが画面に表示されます🎉</p>
+  <p style="color:#999;font-size:13px">※上級者向け：「ショートカット」アプリの「Webページ上でJavaScriptを実行」でも同じことができます。</p>
+  </div></details>
+
+  <details class="os"><summary>🤖 Android（Chrome）のやり方</summary>
+  <div class="a">
+  <p><b>パソコンで設置済みの人：</b>同じGoogleアカウントでChromeを使っていれば、ブックマークは<b>自動でスマホにも同期</b>されています。設置は不要で、下の「実行のしかた」だけでOKです。</p>
+  <p><b>スマホだけで設置する人：</b></p>
+  <p>① Chromeで <b>note.com</b> を開き、右上の「⋮」→「☆」（ブックマークに追加）<br>
+  ② 「⋮」→「ブックマーク」→ いま作った項目の「⋮」→「<b>編集</b>」<br>
+  ③ 名前を「<b>note分析</b>」にして、<b>URLを全部消して</b>コピーしたコードを貼り付け → 戻って保存</p>
+  <p><b>実行のしかた：</b>note.comを開いてログインした状態で、<b>アドレスバーに「note分析」と入力</b>→ 候補に出てくるブックマークをタップ。レポートが画面に表示されます🎉</p>
+  <div class="hint">💡 Androidでは、ブックマーク一覧から直接タップすると動かないことがあります。<b>アドレスバーに名前を打って、候補から選ぶ</b>のが確実です。</div>
+  </div></details>
+</div>
+
+<h2>レポートで分かること</h2>
+<p class="h2sub">「で、結局どうすればいいの？」に答える1枚です</p>
+<div class="feature"><span class="ic">📊</span><span><b>合計PV・スキ・コメント・スキ率</b>　読んだ人のうち何％に刺さったかが分かります</span></div>
+<div class="feature"><span class="ic">🕐</span><span><b>時間帯・曜日ヒートマップ</b>　スキが集まる時間が色で見えて、投稿時間の目安になります</span></div>
+<div class="feature"><span class="ic">🏆</span><span><b>記事別スキ率ランキング</b>　PVの大小と切り離して「刺さった記事」が見つかります</span></div>
+<div class="feature"><span class="ic">💚</span><span><b>常連ファン</b>　何回もスキをくれている人が分かります</span></div>
+<div class="feature"><span class="ic">🌱</span><span><b>見込みフォロワー</b>　まだフォローしてないのにスキをくれる人。活動時間帯・プロフィールURLつき</span></div>
+<div class="feature"><span class="ic">🤖</span><span><b>AIに相談（おまけ）</b>　あなたの数字入りの相談文をコピーして、ChatGPTなど好きな無料AIに貼るだけで改善アドバイスがもらえます（APIキー不要）</span></div>
+
+<h2>こまったときは</h2>
+<p class="h2sub">だいたいここで解決します。押すと開きます👇</p>
+
+<details><summary>ボタンがドラッグできない／ブックマークに登録できない</summary>
+<div class="a">
+<p>まれにブラウザが登録を止めることがあります。その場合は「コンソール」から直接動かせます。</p>
+<p>① noteのページを開く → ② キーボードの <kbd>F12</kbd> を押す → ③ 出てきた画面の「<b>Console（コンソール）</b>」タブを押す → ④ 下のコードを全部コピーして貼り付け、<kbd>Enter</kbd>。</p>
+<textarea class="code" readonly onclick="this.select()">/* note わくわく分析レポート — ローダー（この中身がブックマークになる）
+   BASE だけを自分のGitHub PagesのURLに変えて使う。 */
+(function () {
+  var BASE = "https://avakero.github.io/note-report/"; /* 確定済みURL（末尾スラッシュ必須） */
+  if (window.__noteToolLoading) return;
+  window.__noteToolLoading = true;
+  window.__NOTE_BASE = BASE;
+  var s = document.createElement("script");
+  s.src = BASE + "note-tool-beta.js?t=" + Date.now();
+  s.onload = function () { window.__noteToolLoading = false; };
+  s.onerror = function () {
+    window.__noteToolLoading = false;
+    alert("ツールの読み込みに失敗しました。通信環境を確認して、もう一度お試しください。");
+  };
+  (document.body || document.documentElement).appendChild(s);
+})();</textarea>
+<p style="color:#999;font-size:13px">※初回は「allow pasting」と入力してから貼り付けるよう求められることがあります（安全確認のためのChromeの仕様です）。</p>
+</div></details>
+
+<details><summary>「📊 note分析」を押しても何も起きない</summary>
+<div class="a">
+<p>次の2つを確認してください。</p>
+<p>① <b>noteのページ（note.com）で押していますか？</b>　他のサイトでは動きません。<br>
+② <b>noteにログインしていますか？</b>　ログインなしでも動きますが、PVは取れません。</p>
+<p>それでも動かないときは、ページを再読み込み（<kbd>F5</kbd>）してからもう一度押してみてください。</p>
+</div></details>
+
+<details><summary>「ツールの読み込みに失敗しました」と出る</summary>
+<div class="a">
+<p>インターネット接続を確認して、少し待ってからもう一度押してください。それでも続く場合は、配布元（LINE）までひとことください🐸</p>
+</div></details>
+
+<details><summary>これって安全なの？データはどこかに送られない？</summary>
+<div class="a">
+<p><b>どこにも送信しません。</b>あなたのブラウザの中だけで動いて、あなたのパソコンにレポートファイルを保存するだけです。ログイン情報やパスワードにも触れません。</p>
+</div></details>
+
+<details><summary>noteに負担はかからないの？</summary>
+<div class="a">
+<p>負担をかけないための安全装置を最初から組み込んであります。</p>
+<p>・アカウントの規模に応じて、取得の速度を自動でゆるめます（実行前に「推定◯秒」を表示）<br>
+・前回から約10分以内の連続実行には確認メッセージが出ます<br>
+・noteが混み合う信号を受けたら自動で待機・停止します<br>
+・1回の取得量に上限があります</p>
+<p>それでも<b>使うのは1日数回まで</b>、たまの健康診断くらいのペースでお願いします🐸</p>
+</div></details>
+
+<div class="notes">
+<b>ご利用にあたって</b>
+<ul>
+<li>note公式ではなく非公式の仕組みを利用しています。noteの仕様変更で、ある日突然動かなくなる可能性があります（その際はできる範囲で直します）。</li>
+<li>個人の分析用ツールです。大量・高頻度の実行は避けてください。</li>
+<li>このページはLINE登録者さん限定の配布です。URLの転載はご遠慮ください。</li>
+<li>コメントは件数のみ対応（誰がくれたかは現状取得できません）。</li>
+</ul>
+</div>
+
+<p class="footer">note わくわく分析レポート 🐸 Kyosuke</p>
+</div>
+<script>
+(function () {
+  var btn = document.getElementById('bm-copy'), ta = document.getElementById('bm-code');
+  if (!btn || !ta) return;
+  function ok() {
+    btn.textContent = '✅ コピーしました！このまま手順②へ';
+    setTimeout(function () { btn.textContent = '📋 コードをコピー'; }, 3000);
+  }
+  function fallback() {
+    try { ta.focus(); ta.select(); ta.setSelectionRange(0, ta.value.length); document.execCommand('copy'); ok(); }
+    catch (e) { btn.textContent = '長押しで全選択してコピーしてください'; }
+  }
+  btn.addEventListener('click', function () {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(ta.value).then(ok, fallback);
+    } else { fallback(); }
+  });
+})();
+</script>
+</body></html>

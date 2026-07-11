@@ -283,6 +283,90 @@ window.__noteUI = (function () {
         '途中で止まってしまいました。ページを一度読み込み直してから、もう一度お試しください。';
     },
 
+    /* ---------- スマホ用：レポートをその場で全画面表示 ----------
+       ファイル保存だと「どこに行ったか分からない」になりやすいので、
+       スマホではページの上に全画面でレポートを出し、保存は任意にする。 */
+    viewer: function (reportHtml, filename) {
+      var d = getDoc();
+      if (!d) return;
+      var host = d.body || d.documentElement;
+      if (!host) return;
+
+      // すでに開いていたら出し直す
+      var old = d.getElementById('__note_report_viewer');
+      if (old && old.parentNode) old.parentNode.removeChild(old);
+
+      var blob = new Blob([reportHtml], { type: 'text/html;charset=utf-8' });
+      var url = URL.createObjectURL(blob);
+
+      var wrap = d.createElement('div');
+      wrap.setAttribute('id', '__note_report_viewer');
+      wrap.style.cssText = RESET +
+        'position:fixed;top:0;left:0;right:0;bottom:0;z-index:2147483647;' +
+        'background:#FFFFFF;display:flex;flex-direction:column;direction:ltr;';
+
+      // 上部バー（タイトル・保存・閉じる）
+      var bar = d.createElement('div');
+      bar.style.cssText = RESET +
+        'flex:none;display:flex;align-items:center;gap:8px;' +
+        'padding:10px 12px;padding-top:calc(10px + env(safe-area-inset-top,0px));' +
+        'background:#FFFFFF;border-bottom:1px solid #E3E9F2;';
+
+      var barTitle = d.createElement('div');
+      barTitle.style.cssText = RESET +
+        'flex:1;min-width:0;font-size:14px;font-weight:700;color:' + TEXT_DARK + ';' +
+        'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
+      barTitle.textContent = '📊 レポートができました！';
+      bar.appendChild(barTitle);
+
+      var saveBtn = d.createElement('button');
+      saveBtn.textContent = '💾 保存';
+      saveBtn.style.cssText = RESET +
+        'flex:none;cursor:pointer;font-size:14px;font-weight:700;' +
+        'background:' + ACCENT_SOFT + ';color:' + ACCENT + ';' +
+        'padding:8px 14px;border-radius:10px;';
+      saveBtn.onclick = function () {
+        // できれば共有シート（iPhoneの「"ファイル"に保存」など）、だめならダウンロード
+        try {
+          if (navigator.canShare && typeof File === 'function') {
+            var f = new File([reportHtml], filename, { type: 'text/html' });
+            if (navigator.canShare({ files: [f] })) {
+              navigator.share({ files: [f], title: filename }).catch(function () {});
+              return;
+            }
+          }
+        } catch (e) { /* 共有が使えない端末はダウンロードへ */ }
+        var a = d.createElement('a');
+        a.href = url; a.download = filename;
+        host.appendChild(a); a.click();
+        setTimeout(function () { if (a.parentNode) a.parentNode.removeChild(a); }, 1000);
+      };
+      bar.appendChild(saveBtn);
+
+      var viewerClose = d.createElement('button');
+      viewerClose.textContent = '× 閉じる';
+      viewerClose.style.cssText = RESET +
+        'flex:none;cursor:pointer;font-size:14px;font-weight:700;' +
+        'background:#F2F4F7;color:' + TEXT_GRAY + ';' +
+        'padding:8px 14px;border-radius:10px;';
+      viewerClose.onclick = function () {
+        if (wrap.parentNode) wrap.parentNode.removeChild(wrap);
+        setTimeout(function () { try { URL.revokeObjectURL(url); } catch (e) {} }, 1000);
+      };
+      bar.appendChild(viewerClose);
+
+      wrap.appendChild(bar);
+
+      var frame = d.createElement('iframe');
+      frame.setAttribute('title', 'note 分析レポート');
+      frame.style.cssText = RESET +
+        'flex:1;width:100%;height:100%;border:0;background:#FFFFFF;';
+      frame.src = url;
+      wrap.appendChild(frame);
+
+      host.appendChild(wrap);
+    },
+
     /* ---------- オーバーレイを消す ---------- */
     remove: function () {
       if (!this._root) return;
@@ -1277,12 +1361,20 @@ window.noteAnalyze = async function (opts) {
 
     const ymd = new Date().toISOString().slice(0, 10);
     const filename = 'note_report_' + user + '_' + ymd + '.html';
+    // スマホ（タッチ端末）はダウンロードだと迷子になりやすいので、その場で全画面表示する
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) ||
+      (window.matchMedia && matchMedia('(hover: none) and (pointer: coarse)').matches);
     if (download) {
-      const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a'); a.href = url; a.download = filename; a.click();
-      setTimeout(() => URL.revokeObjectURL(url), 4000);
-      UI.done(filename);
+      if (isMobile && UI.viewer) {
+        UI.remove();
+        UI.viewer(html, filename);
+      } else {
+        const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a'); a.href = url; a.download = filename; a.click();
+        setTimeout(() => URL.revokeObjectURL(url), 4000);
+        UI.done(filename);
+      }
     }
     return { summary: { user, articles: arts.length, totLike, totCmt, totPV, uniqueLikers: Object.keys(uLike).length, followers: followers.size, prospects: prospects.length, backoffHit }, htmlLen: html.length };
   } catch (e) {

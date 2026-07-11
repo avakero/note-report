@@ -64,6 +64,13 @@ kbd{background:#fff;border:1px solid #ccc;border-bottom-width:3px;border-radius:
 .btn:active{cursor:grabbing}
 .btn-caption{font-size:13px;color:var(--sub);margin-top:8px}
 
+/* スマホ用ガイド */
+.copy-btn{display:block;margin:10px auto 0;background:linear-gradient(180deg,#4aad72,#3d9b63);
+  color:#fff;border:0;border-radius:12px;padding:13px 26px;font-size:16px;font-weight:800;
+  cursor:pointer;box-shadow:0 3px 10px rgba(61,155,99,.35)}
+details.os summary::before{content:none}
+details.os summary{font-size:16px}
+
 /* できることリスト */
 .feature{display:flex;gap:10px;background:var(--card);border:1px solid var(--line);
   border-radius:12px;padding:12px 16px;margin:10px 0;font-size:15px}
@@ -100,7 +107,7 @@ textarea.code{width:100%;height:100px;font:12px/1.5 Consolas,monospace;color:#55
 </div>
 
 <div class="sp-alert">📱 <b>いまスマホで見ていますか？</b><br>
-このツールの設置は<b>パソコンのブラウザ</b>で行います。このページのURLをコピーして（LINEのトークからパソコンに送るのがかんたんです）、あとでパソコンで開いてください。</div>
+スマホでもそのまま使えます！ 設置のやり方が少しちがうので、<a href="#sp-guide" style="color:#8a6100;font-weight:700">下の「スマホで使う」の手順</a>に進んでください。（パソコンをお持ちの方は、パソコンのほうがかんたんです）</div>
 
 <h2>じゅんび：ブックマークバーを出す</h2>
 <p class="h2sub">最初の1回だけ。もう表示されている人は飛ばしてOK！</p>
@@ -140,6 +147,48 @@ textarea.code{width:100%;height:100px;font:12px/1.5 Consolas,monospace;color:#55
   <div class="step-head"><span class="num">3</span><b>ブックマークバーの「📊 note分析」を押す</b></div>
   <p>画面の右上に「スキを集めています…」のような進捗が出て、<b>数十秒でレポートが自動ダウンロード</b>されます。</p>
   <p>ダウンロードされた <b>note_report_〇〇.html</b> というファイルを<b>ダブルクリック</b>すると、ブラウザでレポートが開きます🎉</p>
+</div>
+
+<h2 id="sp-guide">スマホで使う（iPhone・Android）</h2>
+<p class="h2sub">パソコンがなくても大丈夫。「ドラッグ」の代わりに「コピーして貼る」だけです📱</p>
+
+<div class="step">
+  <p style="margin:0"><b>スマホでは、レポートはその場で画面いっぱいに表示されます。</b><br>
+  実行すると全画面でレポートが開き、「💾 保存」ボタンを押せばファイルとしても残せます。パソコンのように「ダウンロードしたファイルを探す」必要はありません。</p>
+</div>
+
+<div class="step">
+  <div class="step-head"><span class="num">1</span><b>まず、下のコードをコピーする</b></div>
+  <p>これが「ブックマークの中身」になります。ボタンひとつでコピーできます👇</p>
+  <textarea class="code" id="bm-code" readonly onclick="this.select()">javascript:%2F*%20note%20%E3%82%8F%E3%81%8F%E3%82%8F%E3%81%8F%E5%88%86%E6%9E%90%E3%83%AC%E3%83%9D%E3%83%BC%E3%83%88%20%E2%80%94%20%E3%83%AD%E3%83%BC%E3%83%80%E3%83%BC%EF%BC%88%E3%81%93%E3%81%AE%E4%B8%AD%E8%BA%AB%E3%81%8C%E3%83%96%E3%83%83%E3%82%AF%E3%83%9E%E3%83%BC%E3%82%AF%E3%81%AB%E3%81%AA%E3%82%8B%EF%BC%89%0A%20%20%20BASE%20%E3%81%A0%E3%81%91%E3%82%92%E8%87%AA%E5%88%86%E3%81%AEGitHub%20Pages%E3%81%AEURL%E3%81%AB%E5%A4%89%E3%81%88%E3%81%A6%E4%BD%BF%E3%81%86%E3%80%82%20*%2F%0A(function%20()%20%7B%0A%20%20var%20BASE%20%3D%20%22https%3A%2F%2Favakero.github.io%2Fnote-report%2F%22%3B%20%2F*%20%E7%A2%BA%E5%AE%9A%E6%B8%88%E3%81%BFURL%EF%BC%88%E6%9C%AB%E5%B0%BE%E3%82%B9%E3%83%A9%E3%83%83%E3%82%B7%E3%83%A5%E5%BF%85%E9%A0%88%EF%BC%89%20*%2F%0A%20%20if%20(window.__noteToolLoading)%20return%3B%0A%20%20window.__noteToolLoading%20%3D%20true%3B%0A%20%20window.__NOTE_BASE%20%3D%20BASE%3B%0A%20%20var%20s%20%3D%20document.createElement(%22script%22)%3B%0A%20%20s.src%20%3D%20BASE%20%2B%20%22note-tool.js%3Ft%3D%22%20%2B%20Date.now()%3B%0A%20%20s.onload%20%3D%20function%20()%20%7B%20window.__noteToolLoading%20%3D%20false%3B%20%7D%3B%0A%20%20s.onerror%20%3D%20function%20()%20%7B%0A%20%20%20%20window.__noteToolLoading%20%3D%20false%3B%0A%20%20%20%20alert(%22%E3%83%84%E3%83%BC%E3%83%AB%E3%81%AE%E8%AA%AD%E3%81%BF%E8%BE%BC%E3%81%BF%E3%81%AB%E5%A4%B1%E6%95%97%E3%81%97%E3%81%BE%E3%81%97%E3%81%9F%E3%80%82%E9%80%9A%E4%BF%A1%E7%92%B0%E5%A2%83%E3%82%92%E7%A2%BA%E8%AA%8D%E3%81%97%E3%81%A6%E3%80%81%E3%82%82%E3%81%86%E4%B8%80%E5%BA%A6%E3%81%8A%E8%A9%A6%E3%81%97%E3%81%8F%E3%81%A0%E3%81%95%E3%81%84%E3%80%82%22)%3B%0A%20%20%7D%3B%0A%20%20(document.body%20%7C%7C%20document.documentElement).appendChild(s)%3B%0A%7D)()%3B%0Avoid%200%3B</textarea>
+  <button class="copy-btn" id="bm-copy" type="button">📋 コードをコピー</button>
+</div>
+
+<div class="step">
+  <div class="step-head"><span class="num">2</span><b>自分のスマホに合わせて設置する</b></div>
+  <p>お使いの機種のほうを押して開いてください👇</p>
+
+  <details class="os"><summary>🍎 iPhone（Safari）のやり方</summary>
+  <div class="a">
+  <p><b>① ブックマークをひとつ作る</b><br>
+  Safariで <b>note.com</b> を開き、下の共有ボタン（□に↑）→「<b>ブックマークを追加</b>」。名前を「<b>note分析</b>」にして保存します。</p>
+  <p><b>② ブックマークの中身を貼り替える</b><br>
+  下の本のマーク（ブックマーク一覧）→ 右下の「<b>編集</b>」→ さっき作った「note分析」をタップ → <b>URLの欄を全部消して</b>、コピーしたコードを貼り付け → 完了。</p>
+  <p><b>③ 実行する</b><br>
+  note.comを開いてログインした状態で、ブックマーク一覧から「<b>note分析</b>」をタップ。レポートが画面に表示されます🎉</p>
+  <p style="color:#999;font-size:13px">※上級者向け：「ショートカット」アプリの「Webページ上でJavaScriptを実行」でも同じことができます。</p>
+  </div></details>
+
+  <details class="os"><summary>🤖 Android（Chrome）のやり方</summary>
+  <div class="a">
+  <p><b>パソコンで設置済みの人：</b>同じGoogleアカウントでChromeを使っていれば、ブックマークは<b>自動でスマホにも同期</b>されています。設置は不要で、下の「実行のしかた」だけでOKです。</p>
+  <p><b>スマホだけで設置する人：</b></p>
+  <p>① Chromeで <b>note.com</b> を開き、右上の「⋮」→「☆」（ブックマークに追加）<br>
+  ② 「⋮」→「ブックマーク」→ いま作った項目の「⋮」→「<b>編集</b>」<br>
+  ③ 名前を「<b>note分析</b>」にして、<b>URLを全部消して</b>コピーしたコードを貼り付け → 戻って保存</p>
+  <p><b>実行のしかた：</b>note.comを開いてログインした状態で、<b>アドレスバーに「note分析」と入力</b>→ 候補に出てくるブックマークをタップ。レポートが画面に表示されます🎉</p>
+  <div class="hint">💡 Androidでは、ブックマーク一覧から直接タップすると動かないことがあります。<b>アドレスバーに名前を打って、候補から選ぶ</b>のが確実です。</div>
+  </div></details>
 </div>
 
 <h2>レポートで分かること</h2>
@@ -217,4 +266,23 @@ textarea.code{width:100%;height:100px;font:12px/1.5 Consolas,monospace;color:#55
 
 <p class="footer">note わくわく分析レポート 🐸 Kyosuke</p>
 </div>
+<script>
+(function () {
+  var btn = document.getElementById('bm-copy'), ta = document.getElementById('bm-code');
+  if (!btn || !ta) return;
+  function ok() {
+    btn.textContent = '✅ コピーしました！このまま手順②へ';
+    setTimeout(function () { btn.textContent = '📋 コードをコピー'; }, 3000);
+  }
+  function fallback() {
+    try { ta.focus(); ta.select(); ta.setSelectionRange(0, ta.value.length); document.execCommand('copy'); ok(); }
+    catch (e) { btn.textContent = '長押しで全選択してコピーしてください'; }
+  }
+  btn.addEventListener('click', function () {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(ta.value).then(ok, fallback);
+    } else { fallback(); }
+  });
+})();
+</script>
 </body></html>

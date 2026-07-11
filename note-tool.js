@@ -326,16 +326,26 @@ window.__noteUI = (function () {
         'background:' + ACCENT_SOFT + ';color:' + ACCENT + ';' +
         'padding:8px 14px;border-radius:10px;';
       saveBtn.onclick = function () {
-        // できれば共有シート（iPhoneの「"ファイル"に保存」など）、だめならダウンロード
-        try {
-          if (navigator.canShare && typeof File === 'function') {
-            var f = new File([reportHtml], filename, { type: 'text/html' });
-            if (navigator.canShare({ files: [f] })) {
-              navigator.share({ files: [f], title: filename }).catch(function () {});
-              return;
+        // 実機検証の結果に基づく分岐：
+        //   iOS  … <a download> が効かないので、共有シート→「"ファイル"に保存」が確実
+        //   Android/PC … 通常ダウンロードがワンタップで最も分かりやすい
+        var ua = navigator.userAgent || '';
+        var isIOS = /iPhone|iPad|iPod/i.test(ua) ||
+          (/Macintosh/i.test(ua) && navigator.maxTouchPoints > 1); // iPadOS対策
+        if (isIOS) {
+          try {
+            if (navigator.canShare && typeof File === 'function') {
+              var f = new File([reportHtml], filename, { type: 'text/html' });
+              if (navigator.canShare({ files: [f] })) {
+                navigator.share({ files: [f], title: filename }).catch(function () {});
+                return;
+              }
             }
-          }
-        } catch (e) { /* 共有が使えない端末はダウンロードへ */ }
+          } catch (e) { /* 共有不可なら下のフォールバックへ */ }
+          // 古いiOS等で共有が使えない場合：新しいタブで開き、Safariの共有→保存に誘導
+          try { window.open(url, '_blank'); return; } catch (e) {}
+        }
+        // Android・PC：通常ダウンロード
         var a = d.createElement('a');
         a.href = url; a.download = filename;
         host.appendChild(a); a.click();

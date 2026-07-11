@@ -319,6 +319,45 @@ window.__noteUI = (function () {
       barTitle.textContent = '📊 レポートができました！';
       bar.appendChild(barTitle);
 
+      // 案内メッセージ（バーの下に数秒だけ表示）
+      var toast = function (msg) {
+        var t = d.createElement('div');
+        t.textContent = msg;
+        t.style.cssText = RESET +
+          'position:absolute;left:12px;right:12px;' +
+          'top:calc(58px + env(safe-area-inset-top,0px));z-index:1;' +
+          'background:rgba(23,42,33,.93);color:#FFFFFF;font-size:13px;line-height:1.6;' +
+          'padding:10px 14px;border-radius:12px;box-shadow:0 4px 12px rgba(0,0,0,.25);';
+        wrap.appendChild(t);
+        setTimeout(function () { if (t.parentNode) t.parentNode.removeChild(t); }, 8000);
+      };
+
+      /* PDF保存：外部ライブラリなしで確実なのはOSの印刷機能。
+         レポート（iframe）に対して print() を呼ぶと、
+         Android は印刷画面で「PDF形式で保存」、
+         iOS はプリント画面の共有から「"ファイル"に保存」でPDFにできる。 */
+      var pdfBtn = d.createElement('button');
+      pdfBtn.textContent = '📄 PDF';
+      pdfBtn.style.cssText = RESET +
+        'flex:none;cursor:pointer;font-size:14px;font-weight:700;' +
+        'background:' + ACCENT_SOFT + ';color:' + ACCENT + ';' +
+        'padding:8px 14px;border-radius:10px;';
+      pdfBtn.onclick = function () {
+        var isAndroid = /Android/i.test(navigator.userAgent || '');
+        toast(isAndroid
+          ? '印刷画面が開いたら「PDF形式で保存」を選んでね'
+          : 'プリント画面が開いたら、右上の共有ボタン→「"ファイル"に保存」でPDFになるよ');
+        setTimeout(function () {
+          try {
+            var w = frame && frame.contentWindow;
+            if (w && typeof w.print === 'function') { w.focus(); w.print(); return; }
+          } catch (e) { /* 印刷が使えない場合は下のフォールバックへ */ }
+          // 印刷が呼べない環境：新しいタブで開き、ブラウザメニューの「印刷」からPDF保存してもらう
+          try { window.open(url, '_blank'); } catch (e) {}
+        }, 300);
+      };
+      bar.appendChild(pdfBtn);
+
       var saveBtn = d.createElement('button');
       saveBtn.textContent = '💾 保存';
       saveBtn.style.cssText = RESET +

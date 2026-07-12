@@ -1,0 +1,179 @@
+<!doctype html><html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>note わくわく分析レポート｜よくある質問</title>
+<style>
+:root{
+  --green:#3d9b63; --green-dark:#2e7a4d; --green-pale:#e8f5ee;
+  --ink:#333; --sub:#777; --cream:#fdfbf5; --card:#ffffff;
+  --line:#e5e0d5; --accent:#e8618c;
+}
+*{box-sizing:border-box}
+body{font:16px/1.9 -apple-system,"Hiragino Kaku Gothic ProN","Yu Gothic UI",Meiryo,sans-serif;
+  color:var(--ink);background:var(--cream);margin:0;padding:0}
+.wrap{max-width:680px;margin:0 auto;padding:24px 18px 60px}
+
+.hero{text-align:center;padding:28px 10px 8px}
+.hero .emoji{font-size:56px;line-height:1}
+h1{font-size:26px;margin:10px 0 6px;color:var(--green-dark)}
+.hero .lead{color:var(--sub);font-size:15px;margin:0}
+
+h2{font-size:20px;color:var(--green-dark);margin:44px 0 6px;padding-left:12px;
+  border-left:5px solid var(--green);line-height:1.5}
+.h2sub{color:var(--sub);font-size:14px;margin:0 0 16px;padding-left:17px}
+
+details{background:var(--card);border:1px solid var(--line);border-radius:12px;
+  padding:0;margin:10px 0;overflow:hidden}
+summary{cursor:pointer;padding:14px 18px;font-weight:700;font-size:15px;list-style:none;position:relative;padding-right:40px}
+summary::-webkit-details-marker{display:none}
+summary::before{content:"Q";display:inline-block;background:var(--green);color:#fff;border-radius:8px;
+  width:24px;height:24px;text-align:center;line-height:24px;font-size:13px;margin-right:10px}
+summary::after{content:"＋";position:absolute;right:16px;color:var(--sub)}
+details[open] summary::after{content:"－"}
+.a{padding:0 18px 16px;font-size:15px;color:#444}
+.a b{color:var(--green-dark)}
+.a ul{margin:8px 0;padding-left:22px}
+
+.line-box{background:var(--green-pale);border-radius:16px;padding:22px 20px;text-align:center;margin:44px 0 0}
+.line-box b{color:var(--green-dark);font-size:17px}
+.line-btn{display:inline-block;background:linear-gradient(180deg,#4aad72,#3d9b63);color:#fff;
+  padding:13px 30px;border-radius:12px;text-decoration:none;font-weight:800;font-size:16px;
+  box-shadow:0 3px 10px rgba(61,155,99,.35);margin-top:12px}
+.footer{text-align:center;color:var(--sub);font-size:13px;margin-top:48px}
+</style>
+</head><body>
+<div class="wrap">
+
+<div class="hero">
+  <div class="emoji">🐸</div>
+  <h1>よくある質問</h1>
+  <p class="lead">note わくわく分析レポート FAQ</p>
+</div>
+
+<h2>🐸 ツールについて</h2>
+
+<details><summary>これは何をするツールですか？</summary>
+<div class="a">
+<p>あなたのnoteを丸ごと分析して、1枚のレポート（HTMLファイル）にするツールです。</p>
+<p>スキが集まる時間帯・曜日、PVと切り離した「刺さった記事」ランキング、まだフォローしていないのにスキをくれている「見込みフォロワー」などが分かります。</p>
+</div></details>
+
+<details><summary>本当に無料ですか？あとで請求されたりしない？</summary>
+<div class="a">
+<p>無料です。販売ページもありません。LINE登録者さん限定の「こっそり配布」なので、お金は一切かかりません。</p>
+</div></details>
+
+<details><summary>「見込みフォロワー」って何ですか？</summary>
+<div class="a">
+<p>あなたの記事にスキをくれているのに、まだフォローはしていない人のことです。</p>
+<p>すでに興味を持ってくれている＝これから繋がれる可能性がいちばん高い人たちなので、レポートでは一覧で見られるようにしています。</p>
+</div></details>
+
+<h2>🔒 安全性について</h2>
+
+<details><summary>データはどこかに送信されますか？</summary>
+<div class="a">
+<p><b>どこにも送信しません。</b>ツールはあなたのブラウザの中だけで動き、レポートファイルをあなたのパソコン（スマホ）に保存するだけです。作者にもあなたの数字は一切見えません。</p>
+</div></details>
+
+<details><summary>パスワードやログイン情報は大丈夫？</summary>
+<div class="a">
+<p>触れません。ツールは「あなたがnoteにログインしているブラウザ」でそのまま動くだけで、ID・パスワードを入力させることも、読み取ることもありません。</p>
+</div></details>
+
+<details><summary>noteのサーバーに迷惑がかかりませんか？</summary>
+<div class="a">
+<p>負担をかけないための安全装置を最初から組み込んでいます。</p>
+<ul>
+<li>リクエストの間に必ず待ち時間を入れ、アカウントの規模が大きいほど自動でゆっくり取得します</li>
+<li>noteが混雑しているときは自動で一時停止し、待ってから再開します</li>
+<li>1回の実行に上限を設け、超えたら安全に自動ストップします</li>
+<li>連続実行を防ぐため、前回から10分空けることを推奨しています（早すぎると確認が出ます）</li>
+</ul>
+<p>「速く」より「迷惑をかけない」を優先した設計です。</p>
+</div></details>
+
+<details><summary>他人のアカウントも分析できますか？</summary>
+<div class="a">
+<p>できません。<b>自分のデータを、自分で見るためのツール</b>です。ログインしている本人のアカウントだけが対象です。</p>
+</div></details>
+
+<h2>💻 使い方について</h2>
+
+<details><summary>スマホでも使えますか？</summary>
+<div class="a">
+<p>使えます。ただし<b>設置（初回のブックマーク登録）はパソコンが圧倒的にかんたん</b>です。</p>
+<p>おすすめは「PCで設置 → スマホは同じGoogleアカウントのChromeで同期」。iPhone（Safari）・Androidそれぞれの設置手順も設置ページに載せています。</p>
+</div></details>
+
+<details><summary>分析にはどれくらい時間がかかりますか？</summary>
+<div class="a">
+<p>アカウントの規模によります。記事数が少なければ数十秒、記事やスキが多い方は数分かかることがあります。実行中は進み具合が画面に表示されるので、そのまま待っていてください。</p>
+</div></details>
+
+<details><summary>何回でも使えますか？</summary>
+<div class="a">
+<p>使えます。ただしnoteサーバーへの配慮のため、<b>前回の実行から10分以上</b>空けてください（毎日1回・週1回など、定点観測的な使い方がおすすめです）。</p>
+</div></details>
+
+<details><summary>レポートはどこに保存されますか？</summary>
+<div class="a">
+<p>パソコンの場合は「ダウンロード」フォルダにHTMLファイルとして保存されます。ダブルクリックすればブラウザで開けます。</p>
+<p>スマホの場合はダウンロードせず、その場で全画面表示されます（📄PDF・💾保存ボタン付き）。</p>
+</div></details>
+
+<h2>🛠 うまく動かないとき</h2>
+
+<details><summary>ボタンを押しても何も起きません</summary>
+<div class="a">
+<p>次の2つを確認してください。</p>
+<p>① <b>noteのページ（note.com）で押していますか？</b>　他のサイトでは動きません。<br>
+② <b>noteにログインしていますか？</b>　ログアウト状態では分析できません。</p>
+<p>それでも動かないときは、ページを再読み込みしてからもう一度押してみてください。</p>
+</div></details>
+
+<details><summary>「ツールの読み込みに失敗しました」と出ます</summary>
+<div class="a">
+<p>インターネット接続を確認して、少し待ってからもう一度押してください。それでも続く場合は、配布元のLINEにひとことください🐸</p>
+</div></details>
+
+<details><summary>PV（ビュー）が表示されません</summary>
+<div class="a">
+<p>PVはnoteの「ダッシュボード」の数字を使っています。ログインした本人のアカウントでのみ取得できるので、ログイン状態をご確認ください。</p>
+<p>PVが取れない場合でも、スキ・コメントベースの分析はそのまま表示されます。</p>
+</div></details>
+
+<details><summary>途中で「noteが混み合っているようです」と止まりました</summary>
+<div class="a">
+<p>noteサーバーが混雑しているサインです。ツールが自動で何度か待って再試行した上で、それでも難しいときに出るメッセージなので、<b>数分おいてからもう一度</b>お試しください。</p>
+</div></details>
+
+<h2>📦 その他</h2>
+
+<details><summary>ツールの更新はどうすればいいですか？</summary>
+<div class="a">
+<p>何もしなくてOKです。ブックマークを押すたびに最新版が自動で読み込まれる仕組みなので、入れ直しは不要です。新機能はレポート上部のお知らせ枠やLINEでお知らせします。</p>
+</div></details>
+
+<details><summary>友だちに教えてもいいですか？</summary>
+<div class="a">
+<p>設置ページのURLやファイルの直接共有はご遠慮ください🙏</p>
+<p>このツールはLINE登録者さん限定の配布です。紹介したい方がいたら、<b>LINEの登録リンクをシェア</b>してもらえるとうれしいです🐸</p>
+<p>なお「こんなツールを使ってる」という話や、分析結果のスクショ・感想を記事やSNSに載せるのは大歓迎です！</p>
+</div></details>
+
+<details><summary>急に動かなくなることはありますか？</summary>
+<div class="a">
+<p>あります。このツールはnoteの非公式な仕組みを利用しているため、noteの仕様変更で止まる可能性があります。</p>
+<p>その際はできる範囲で対応し、LINEでお知らせします（対応をお約束するものではない点だけご了承ください）。</p>
+</div></details>
+
+<div class="line-box">
+  <b>解決しないときは</b>
+  <p style="margin:8px 0 0;font-size:14px;color:#555">質問・不具合・「こんな数字も見たい」のリクエストは、LINEにメッセージをください🐸</p>
+  <a class="line-btn" href="https://lin.ee/ssPiG3e" target="_blank" rel="noopener">💬 LINEで聞いてみる</a>
+</div>
+
+<p class="footer">note わくわく分析レポート 🐸 Kyosuke</p>
+</div>
+</body></html>

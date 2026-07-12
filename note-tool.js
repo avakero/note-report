@@ -1388,11 +1388,22 @@ window.noteAnalyze = async function (opts) {
     arts.forEach((a) => a.tags.forEach((t) => { (tagMap[t] = tagMap[t] || []).push(a.like); }));
 
     // お知らせ枠（GitHub上のnotice.jsonを毎回読む＝遠隔で更新できる）
+    // ローダーが __NOTE_CHANNEL を設定している配布経路では notice-チャンネル名.json を優先。
+    // チャンネル用ファイルが存在すればそれが正（enabled:false ならそのチャンネルは非表示）、
+    // 存在しない（404）ときだけ共通の notice.json を読む。
     let notice = null;
     try {
       if (window.__NOTE_BASE) {
-        const nr = await fetch(window.__NOTE_BASE + 'notice.json?t=' + Date.now(), { cache: 'no-store' });
-        if (nr.ok) notice = await nr.json();
+        if (window.__NOTE_CHANNEL) {
+          try {
+            const cr = await fetch(window.__NOTE_BASE + 'notice-' + window.__NOTE_CHANNEL + '.json?t=' + Date.now(), { cache: 'no-store' });
+            if (cr.ok) notice = await cr.json();
+          } catch (e2) {}
+        }
+        if (!notice) {
+          const nr = await fetch(window.__NOTE_BASE + 'notice.json?t=' + Date.now(), { cache: 'no-store' });
+          if (nr.ok) notice = await nr.json();
+        }
       }
     } catch (e) {}
 

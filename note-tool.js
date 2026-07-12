@@ -877,20 +877,25 @@ window.__noteBuildHtml = function (d) {
     var hist = Array.isArray(d.snapHist) ? d.snapHist : [];
     var histHtml = "";
     if (hist.length >= 2) {
-      var pvItems = [], likeItems = [];
-      for (var hi = 1; hi < hist.length; hi++) {
-        var s0 = hist[hi - 1], s1 = hist[hi];
+      var histR = hist.slice(-61); // グラフに出すのは直近60日ぶん（記録自体は最大400日残る）
+      var pvItems = [], likeItems = [], cmtItems = [], folItems = [];
+      for (var hi = 1; hi < histR.length; hi++) {
+        var s0 = histR[hi - 1], s1 = histR[hi];
         if (!s0 || !s1 || !s1.at) continue;
         var hd = new Date(Number(s1.at));
         var lbl = isNaN(hd.getTime()) ? "?" : (hd.getMonth() + 1) + "/" + hd.getDate();
         if (s0.totPV != null && s1.totPV != null) pvItems.push({ label: lbl, v: Math.max(0, Number(s1.totPV) - Number(s0.totPV)) });
         likeItems.push({ label: lbl, v: Math.max(0, (Number(s1.totLike) || 0) - (Number(s0.totLike) || 0)) });
+        cmtItems.push({ label: lbl, v: Math.max(0, (Number(s1.totCmt) || 0) - (Number(s0.totCmt) || 0)) });
+        if (s0.fol != null && s1.fol != null) folItems.push({ label: lbl, v: Math.max(0, Number(s1.fol) - Number(s0.fol)) });
       }
       var histCols = "";
       if (hasPV && pvItems.length) histCols += '<div class="card"><h3 style="margin:0 0 10px;font-size:14.5px">👀 1日ごとのPVの伸び</h3>' + barChart(pvItems, "f-green") + "</div>";
       if (likeItems.length) histCols += '<div class="card"><h3 style="margin:0 0 10px;font-size:14.5px">💛 1日ごとのスキの伸び</h3>' + barChart(likeItems, "f-sun") + "</div>";
+      if (cmtItems.length) histCols += '<div class="card"><h3 style="margin:0 0 10px;font-size:14.5px">💬 1日ごとのコメントの伸び</h3>' + barChart(cmtItems, "f-sky") + "</div>";
+      if (folItems.length) histCols += '<div class="card"><h3 style="margin:0 0 10px;font-size:14.5px">🌱 1日ごとのフォロワーの伸び</h3>' + barChart(folItems, "f-coral") + "</div>";
       if (histCols) histHtml = '<div class="twocol" style="margin-top:14px">' + histCols + "</div>" +
-        '<p class="note">レポートを作った日ごとの「前回からの増え方」。作らなかった日のぶんは、次に作った日の棒にまとめて入ります。毎日作ると最大30日ぶんの推移が貯まるよ。</p>';
+        '<p class="note">レポートを作った日ごとの「前回からの増え方」。作らなかった日のぶんは、次に作った日の棒にまとめて入ります。記録は最大400日ぶん残り、グラフには直近60日ぶんを表示。減った日（フォロワー解除など）は0として表示されます。</p>';
     }
 
     diffHtml = '<p class="sec-sub">前回のレポート（' + esc(prevLabel) + (daysAgo != null ? "・" + daysAgo + "日前" : "") + '）とくらべた増え方だよ。</p>' +
@@ -972,6 +977,8 @@ window.__noteBuildHtml = function (d) {
     ".bar-fill{display:block;height:100%;border-radius:999px}" +
     ".f-green{background:linear-gradient(90deg,#5ED09A,#17A366)}" +
     ".f-sun{background:linear-gradient(90deg,#FFD666,#F5A300)}" +
+    ".f-sky{background:linear-gradient(90deg,#7FD0F0,#2E97C8)}" +
+    ".f-coral{background:linear-gradient(90deg,#FFA48E,#F2694A)}" +
     ".bar-val{flex:0 0 40px;text-align:right;font-variant-numeric:tabular-nums;color:var(--ink)}" +
     ".tblwrap{overflow-x:auto;border-radius:16px;border:1px solid var(--line);background:var(--card)}" +
     "table{border-collapse:collapse;width:100%;min-width:640px;font-size:13.5px}" +
@@ -1505,9 +1512,12 @@ window.noteAnalyze = async function (opts) {
       const sameDay = (t1, t2) => { const x = new Date(Number(t1)), y = new Date(Number(t2)); return x.getFullYear() === y.getFullYear() && x.getMonth() === y.getMonth() && x.getDate() === y.getDate(); };
       // 比較相手は「今日以外」の直近スナップショット（同日に何度作っても比較が0にならないように）
       for (let i = snaps.length - 1; i >= 0; i--) { if (snaps[i] && snaps[i].at && !sameDay(snaps[i].at, nowSnap.at)) { prevSnap = snaps[i]; break; } }
-      // 保存は1日1件（同じ日の実行は上書き）。直近30日ぶんだけ残す。
+      // 保存は1日1件（同じ日の実行は上書き）。
       if (snaps.length && snaps[snaps.length - 1] && sameDay(snaps[snaps.length - 1].at, nowSnap.at)) snaps[snaps.length - 1] = nowSnap; else snaps.push(nowSnap);
-      while (snaps.length > 30) snaps.shift();
+      // 1年つづけても推移が消えないよう、履歴そのものは最大400日ぶん保持する。
+      // ただし容量の大きい「記事ごとの明細(arts)」は直近30件だけ残し、古い分は全体合計のみにスリム化。
+      while (snaps.length > 400) snaps.shift();
+      for (let i = 0; i < snaps.length - 30; i++) { if (snaps[i] && snaps[i].arts) delete snaps[i].arts; }
       for (;;) {
         try { localStorage.setItem(SNAP_KEY, JSON.stringify(snaps)); snapSaved = true; break; }
         catch (e) { if (snaps.length <= 1) break; snaps.splice(0, Math.ceil(snaps.length / 2)); }

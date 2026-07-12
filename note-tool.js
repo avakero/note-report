@@ -933,7 +933,7 @@ window.__noteBuildHtml = function (d) {
     "*{box-sizing:border-box}" +
     'body{margin:0;background:var(--bg);color:var(--ink);font-family:"Hiragino Kaku Gothic ProN","Hiragino Sans","Yu Gothic UI","Noto Sans JP",Meiryo,system-ui,sans-serif;font-size:15px;line-height:1.75;-webkit-text-size-adjust:100%}' +
     ".wrap{max-width:1060px;margin:0 auto;padding:28px 18px 64px}" +
-    "header.hd{position:relative;overflow:hidden;background:linear-gradient(130deg,#14A26A 0%,#2FB984 48%,#4BAFD8 100%);color:#fff;border-radius:26px;padding:30px 28px;margin-bottom:28px;box-shadow:0 6px 20px rgba(23,163,102,.22)}.hd-hero-wrap{max-width:300px;margin:2px auto 10px}.hd-hero{display:block;width:100%;filter:drop-shadow(0 6px 10px rgba(0,0,0,.16))}.hd{text-align:center}.hd-meta{justify-content:center}.hd-2col{display:flex;align-items:center;gap:22px;text-align:left;flex-wrap:wrap}.hd-2col .hd-hero-wrap{max-width:230px;margin:0;flex:0 0 auto}.hd-2col .hd-txt{flex:1 1 240px;min-width:200px}.hd-2col .hd-meta{justify-content:flex-start;margin-top:10px}.hd-lead{font-size:21px;font-weight:800;line-height:1.35;margin-bottom:8px}" +
+    "header.hd{position:relative;overflow:hidden;background:linear-gradient(130deg,#14A26A 0%,#2FB984 48%,#4BAFD8 100%);color:#fff;border-radius:26px;padding:30px 28px;margin-bottom:28px;box-shadow:0 6px 20px rgba(23,163,102,.22)}.hd-hero-wrap{max-width:300px;margin:2px auto 10px}.hd-hero{display:block;width:100%;border-radius:18px;filter:drop-shadow(0 6px 10px rgba(0,0,0,.16))}.hd{text-align:center}.hd-meta{justify-content:center}.hd-2col{display:flex;align-items:center;gap:22px;text-align:left;flex-wrap:wrap}.hd-2col .hd-hero-wrap{max-width:230px;margin:0;flex:0 0 auto}.hd-2col .hd-txt{flex:1 1 240px;min-width:200px}.hd-2col .hd-meta{justify-content:flex-start;margin-top:10px}.hd-lead{font-size:21px;font-weight:800;line-height:1.35;margin-bottom:8px}" +
     "header.hd h1{margin:0 0 6px;font-size:23px;letter-spacing:.02em}" +
     "header.hd .hd-user{font-size:15px;opacity:.97}" +
     "header.hd .hd-meta{margin-top:12px;font-size:12.5px;opacity:.92;display:flex;gap:16px;flex-wrap:wrap}" +
@@ -1082,7 +1082,8 @@ window.__noteBuildHtml = function (d) {
     secTitle("🏷️ ハッシュタグ別 平均スキ", "どのテーマが喜ばれているか。平均スキが高いタグは「読者が待ってる型」だよ。") +
     '<div class="tblwrap"><table style="min-width:520px"><tr><th>タグ</th><th class="n">記事数</th><th class="n">平均スキ</th><th></th></tr>' + tagRows + "</table></div>" +
 
-    '<footer><div class="foot-frog">今日もおつかれさま🐸 数字は励みに、比較はほどほどに。</div><br>このレポートは @' + esc(d.user || "") + " のnote活動データから自動生成されました。</footer>" +
+    '<footer><div class="foot-frog">今日もおつかれさま🐸 数字は励みに、比較はほどほどに。</div><br>このレポートは @' + esc(d.user || "") + " のnote活動データから自動生成されました。" +
+    (d.credit ? "<br>" + esc(d.credit) : "") + "</footer>" +
     "</div></body></html>";
 
   return html;
@@ -1547,6 +1548,30 @@ window.noteAnalyze = async function (opts) {
       }
     } catch (e) {}
 
+    // ブランド枠（チャンネルごとにレポートの見た目を差し替える）
+    // GitHub上の brand-チャンネル名.json を毎回読む＝コラボごとに画像ファイルを置くだけで差し替えられる。
+    // 読めない・存在しない場合は、あばけろ君の標準デザインにフォールバック。
+    let heroImg = window.__NOTE_HERO || null, credit = null;
+    try {
+      if (window.__NOTE_BASE && window.__NOTE_CHANNEL) {
+        const br = await fetch(window.__NOTE_BASE + 'brand-' + window.__NOTE_CHANNEL + '.json?t=' + Date.now(), { cache: 'no-store' });
+        const brand = br.ok ? await br.json() : null;
+        if (brand && brand.enabled !== false) {
+          if (brand.hero) {
+            const hr = await fetch(window.__NOTE_BASE + brand.hero + '?t=' + Date.now(), { cache: 'no-store' });
+            if (hr.ok) {
+              const bytes = new Uint8Array(await hr.arrayBuffer());
+              let bin = '';
+              for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+              const mime = ((hr.headers && hr.headers.get && hr.headers.get('content-type')) || 'image/png').split(';')[0];
+              heroImg = 'data:' + mime + ';base64,' + btoa(bin);
+            }
+          }
+          if (brand.credit) credit = String(brand.credit);
+        }
+      }
+    } catch (e) {}
+
     // 配布チャンネルによる機能の出し分け:
     // コラボ基本版（__NOTE_CHANNEL='collab' かつ __NOTE_PLUS なし）では
     // 「前回とくらべて」「日別スキの推移」セクションを表示しない（最初に複製した版と同じ見た目）。
@@ -1554,7 +1579,7 @@ window.noteAnalyze = async function (opts) {
     // 機能追加版に乗り換えた日から、それまでに貯まった分もグラフに出せるようにするため。
     const liteMode = (window.__NOTE_CHANNEL === 'collab' && !window.__NOTE_PLUS);
 
-    const data = { user, meta, hasPV, arts, totLike, totCmt, totPV, nArt, hourC, wdC, dayC, heat, pHeat, uLike, uMeta, uHours, fans, prospects, tagMap, followers, followerCount: followers.size, prevSnap, snapSaved, snapHist, liteMode, nLikes: allLikes.length, heroImg: (window.__NOTE_HERO || null), WD, esc, peak };
+    const data = { user, meta, hasPV, arts, totLike, totCmt, totPV, nArt, hourC, wdC, dayC, heat, pHeat, uLike, uMeta, uHours, fans, prospects, tagMap, followers, followerCount: followers.size, prevSnap, snapSaved, snapHist, liteMode, credit, nLikes: allLikes.length, heroImg, WD, esc, peak };
     let html = window.__noteBuildHtml(data);
     try {
       if (notice && notice.enabled !== false && notice.message) {

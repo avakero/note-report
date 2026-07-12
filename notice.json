@@ -1,6 +1,6 @@
 {
-  "enabled": false,
-  "message": "ここにお知らせを書くと、レポートの一番上に表示されます🐸",
-  "link": "",
-  "linkText": "くわしく"
+  "enabled": true,
+  "message": "🆕 新機能が2つ増えました！「📈 前回とくらべて伸びチェック」と「📆 日別スキの推移」。別の日にもう一度レポートを作ると、前回からどれだけ伸びたかが見られるよ🐸",
+  "link": "https://avakero.github.io/note-report/faq.html",
+  "linkText": "くわしくはFAQへ"
 }

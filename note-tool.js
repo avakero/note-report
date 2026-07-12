@@ -872,8 +872,29 @@ window.__noteBuildHtml = function (d) {
       ? '<div class="tblwrap" style="margin-top:14px"><table style="min-width:520px"><tr><th>伸びた記事（上位10）</th>' + (hasPV ? "<th class='n'>PV増</th>" : "") + "<th class='n'>スキ増</th><th class='n'>コメント増</th></tr>" + moverRows + "</table></div>" +
         '<p class="note">前回から数字が動いた記事だけを表示しています。</p>'
       : '<p class="empty">前回からまだ動きはないみたい。のんびりいこう🐸</p>';
+
+    /* 貯まったスナップショットから「1日ごとの伸び」推移グラフ（最大30日ぶん） */
+    var hist = Array.isArray(d.snapHist) ? d.snapHist : [];
+    var histHtml = "";
+    if (hist.length >= 2) {
+      var pvItems = [], likeItems = [];
+      for (var hi = 1; hi < hist.length; hi++) {
+        var s0 = hist[hi - 1], s1 = hist[hi];
+        if (!s0 || !s1 || !s1.at) continue;
+        var hd = new Date(Number(s1.at));
+        var lbl = isNaN(hd.getTime()) ? "?" : (hd.getMonth() + 1) + "/" + hd.getDate();
+        if (s0.totPV != null && s1.totPV != null) pvItems.push({ label: lbl, v: Math.max(0, Number(s1.totPV) - Number(s0.totPV)) });
+        likeItems.push({ label: lbl, v: Math.max(0, (Number(s1.totLike) || 0) - (Number(s0.totLike) || 0)) });
+      }
+      var histCols = "";
+      if (hasPV && pvItems.length) histCols += '<div class="card"><h3 style="margin:0 0 10px;font-size:14.5px">👀 1日ごとのPVの伸び</h3>' + barChart(pvItems, "f-green") + "</div>";
+      if (likeItems.length) histCols += '<div class="card"><h3 style="margin:0 0 10px;font-size:14.5px">💛 1日ごとのスキの伸び</h3>' + barChart(likeItems, "f-sun") + "</div>";
+      if (histCols) histHtml = '<div class="twocol" style="margin-top:14px">' + histCols + "</div>" +
+        '<p class="note">レポートを作った日ごとの「前回からの増え方」。作らなかった日のぶんは、次に作った日の棒にまとめて入ります。毎日作ると最大30日ぶんの推移が貯まるよ。</p>';
+    }
+
     diffHtml = '<p class="sec-sub">前回のレポート（' + esc(prevLabel) + (daysAgo != null ? "・" + daysAgo + "日前" : "") + '）とくらべた増え方だよ。</p>' +
-      '<div class="kpis">' + dKpiHtml + "</div>" + moverTable +
+      '<div class="kpis">' + dKpiHtml + "</div>" + moverTable + histHtml +
       frogTip("記事を投稿した翌日にレポートを作ると、「きのう出したあの記事、どれだけ読まれた？」がここでわかるよ！毎日1回作れば前日との差になるんだ🐸");
   } else {
     diffHtml = '<div class="card"><p class="empty">📌 今回の数字をこのブラウザに保存したよ。<b>次に別の日</b>にレポートを作ると、ここに「前回からどれだけ伸びたか」（記事ごとのPV増・スキ増）が出ます。毎日1回作れば「前日との差」が追えるよ🐸' +
@@ -1474,7 +1495,7 @@ window.noteAnalyze = async function (opts) {
     // noteのAPIは記事ごとのPVを「累計値」でしか返さないため、日別の推移は過去に遡って取れない。
     // かわりに実行のたびに記事ごとの数字をこのブラウザ(localStorage)へ記録し、
     // 「前回（別の日）のレポートからどれだけ増えたか」を差分で出す。1日1回作れば前日比になる。
-    let prevSnap = null, snapSaved = false;
+    let prevSnap = null, snapSaved = false, snapHist = null;
     try {
       const SNAP_KEY = 'noteReportSnaps_' + user;
       const nowSnap = { at: Date.now(), totPV, totLike, totCmt, fol: followers.size, arts: {} };
@@ -1491,6 +1512,7 @@ window.noteAnalyze = async function (opts) {
         try { localStorage.setItem(SNAP_KEY, JSON.stringify(snaps)); snapSaved = true; break; }
         catch (e) { if (snaps.length <= 1) break; snaps.splice(0, Math.ceil(snaps.length / 2)); }
       }
+      snapHist = snaps.slice(); // 日ごとの伸び推移グラフ用（1日1件×最大30日）
     } catch (e) {}
 
     // お知らせ枠（GitHub上のnotice.jsonを毎回読む＝遠隔で更新できる）
@@ -1513,7 +1535,7 @@ window.noteAnalyze = async function (opts) {
       }
     } catch (e) {}
 
-    const data = { user, meta, hasPV, arts, totLike, totCmt, totPV, nArt, hourC, wdC, dayC, heat, pHeat, uLike, uMeta, uHours, fans, prospects, tagMap, followers, followerCount: followers.size, prevSnap, snapSaved, nLikes: allLikes.length, heroImg: (window.__NOTE_HERO || null), WD, esc, peak };
+    const data = { user, meta, hasPV, arts, totLike, totCmt, totPV, nArt, hourC, wdC, dayC, heat, pHeat, uLike, uMeta, uHours, fans, prospects, tagMap, followers, followerCount: followers.size, prevSnap, snapSaved, snapHist, nLikes: allLikes.length, heroImg: (window.__NOTE_HERO || null), WD, esc, peak };
     let html = window.__noteBuildHtml(data);
     try {
       if (notice && notice.enabled !== false && notice.message) {

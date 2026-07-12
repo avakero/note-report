@@ -1040,18 +1040,20 @@ window.__noteBuildHtml = function (d) {
     secTitle("📊 全体サマリー", "まずはいまの成績をひとめでチェック！") +
     '<div class="kpis">' + kpiHtml + "</div>" +
 
-    /* ③b 前回との比較 */
-    secTitle("📈 前回とくらべて — 伸びチェック", "noteは記事ごとの日別PVを公開していないので、レポートを作るたびに数字を記録して差分を出す方式だよ。") +
-    diffHtml +
+    /* ③b 前回との比較（コラボ基本版では非表示） */
+    (d.liteMode ? "" :
+      secTitle("📈 前回とくらべて — 伸びチェック", "noteは記事ごとの日別PVを公開していないので、レポートを作るたびに数字を記録して差分を出す方式だよ。") +
+      diffHtml) +
 
     /* ④ 時間帯・曜日 */
     secTitle("💛 スキが集まる時間帯・曜日", "読者さんが反応してくれている時間。ピークのちょっと前が投稿の狙い目！") +
     '<div class="twocol"><div class="card"><h3 style="margin:0 0 10px;font-size:14.5px">🕒 時間帯別（スキ件数）</h3>' + barChart(hourItems, "f-green") + "</div>" +
     '<div class="card"><h3 style="margin:0 0 10px;font-size:14.5px">📅 曜日別（スキ件数）</h3>' + barChart(wdItems, "f-sun") + "</div></div>" +
 
-    /* ④b 日別スキ推移 */
-    secTitle("📆 日別スキの推移（最近30日）", "スキが付いた日ごとの件数（スキの時刻から集計）。投稿した日の翌日に山ができていたら、それが「翌日に伸びた」サインだよ。") +
-    '<div class="card">' + barChart(dayItems, "f-green") + "</div>" +
+    /* ④b 日別スキ推移（コラボ基本版では非表示） */
+    (d.liteMode ? "" :
+      secTitle("📆 日別スキの推移（最近30日）", "スキが付いた日ごとの件数（スキの時刻から集計）。投稿した日の翌日に山ができていたら、それが「翌日に伸びた」サインだよ。") +
+      '<div class="card">' + barChart(dayItems, "f-green") + "</div>") +
 
     /* ⑤ ヒートマップ（全体） */
     secTitle("🔥 曜日 × 時間帯ヒートマップ（スキ全体）", "オレンジが濃いマスほどスキが集中！横スクロールで24時間ぶん見られるよ。") +
@@ -1545,7 +1547,14 @@ window.noteAnalyze = async function (opts) {
       }
     } catch (e) {}
 
-    const data = { user, meta, hasPV, arts, totLike, totCmt, totPV, nArt, hourC, wdC, dayC, heat, pHeat, uLike, uMeta, uHours, fans, prospects, tagMap, followers, followerCount: followers.size, prevSnap, snapSaved, snapHist, nLikes: allLikes.length, heroImg: (window.__NOTE_HERO || null), WD, esc, peak };
+    // 配布チャンネルによる機能の出し分け:
+    // コラボ基本版（__NOTE_CHANNEL='collab' かつ __NOTE_PLUS なし）では
+    // 「前回とくらべて」「日別スキの推移」セクションを表示しない（最初に複製した版と同じ見た目）。
+    // ただし記録（スナップショット保存）は全チャンネルで行う。
+    // 機能追加版に乗り換えた日から、それまでに貯まった分もグラフに出せるようにするため。
+    const liteMode = (window.__NOTE_CHANNEL === 'collab' && !window.__NOTE_PLUS);
+
+    const data = { user, meta, hasPV, arts, totLike, totCmt, totPV, nArt, hourC, wdC, dayC, heat, pHeat, uLike, uMeta, uHours, fans, prospects, tagMap, followers, followerCount: followers.size, prevSnap, snapSaved, snapHist, liteMode, nLikes: allLikes.length, heroImg: (window.__NOTE_HERO || null), WD, esc, peak };
     let html = window.__noteBuildHtml(data);
     try {
       if (notice && notice.enabled !== false && notice.message) {

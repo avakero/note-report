@@ -1508,9 +1508,10 @@ window.noteAnalyze = async function (opts) {
     const liteMode = (window.__NOTE_CHANNEL === 'collab' && !window.__NOTE_PLUS);
 
     // 2.6) 有料noteの売上（有料記事がある人・売上がある人にだけ出る）
-    // noteの「売上管理」画面が内部で使っているAPIを利用:
-    //   /api/v1/stats/sales                       … 売上サマリー
-    //   /api/v1/stats/purchasers?datespan=YYYYMM  … 月別の購入明細（ページング）
+    // noteの「売上管理」画面（dashboard/sales）が内部で使うAPIを利用:
+    //   /api/v1/stats/purchasers?datespan=YYYYMM&month=true&sort=date_desc&filter=&page=N
+    // ※ month=true と filter=（空でも付ける）が無いと 400 が返る（2026-07-13 現行フロントの実装から確認）。
+    // 定期購読・メンバーシップの売上は別API（/v3/sales/subscription_history）のため未対応。
     // 非公開APIなので形が変わる可能性がある。読めなかったときは
     // 売上セクションを出さないだけで、レポート本体は止めない。
     // 【出し分け】機能追加版（__NOTE_PLUS 付きの設置ページ）限定。
@@ -1519,24 +1520,34 @@ window.noteAnalyze = async function (opts) {
     if (window.__NOTE_PLUS) {
       try {
         const hasPaid = arts.some((a) => (a.price || 0) > 0);
-        const sj = await api('/api/v1/stats/sales'); await sleep(DELAY);
-        const salesSummary = (sj && sj.data) || null;
-        if (hasPaid || salesSummary) {
+        const spanOf = (d2) => '' + d2.getFullYear() + String(d2.getMonth() + 1).padStart(2, '0');
+        const purchasersUrl = (span, pg) => '/api/v1/stats/purchasers?datespan=' + span + '&month=true&sort=date_desc&filter=&page=' + pg;
+        const readItems = (j) => {
+          const dd = (j && j.data) || {};
+          // 明細の配列フィールド名は複数の可能性に対応（非公開APIのため防御的に）
+          return { dd, items: dd.purchasers || dd.purchase_histories || dd.histories || [] };
+        };
+        const nowD = new Date();
+        // 有料記事がない人は直近2か月だけのぞき、売上ゼロならここで打ち切り
+        // （マガジン等の販売だけの人を拾いつつ、無料運用の人の無駄なリクエストを防ぐ）
+        let proceed = hasPaid;
+        for (let pi = 0; pi < 2 && !proceed; pi++) {
+          const pd = new Date(nowD.getFullYear(), nowD.getMonth() - pi, 1);
+          const j = await api(purchasersUrl(spanOf(pd), 1)); await sleep(DELAY);
+          if (readItems(j).items.length) proceed = true;
+        }
+        if (proceed) {
           UI.status('売上を確認しています…', '有料noteの販売データ', null);
           const monthly = [], byArt = {};
           let totalCnt = 0, totalAmt = 0;
-          const nowD = new Date();
           for (let mi = 11; mi >= 0; mi--) {  // 今月をふくむ直近12か月
             const md = new Date(nowD.getFullYear(), nowD.getMonth() - mi, 1);
-            const span = '' + md.getFullYear() + String(md.getMonth() + 1).padStart(2, '0');
             let mp = 1, mCnt = 0, mAmt = 0;
             while (true) {
-              const j = await api('/api/v1/stats/purchasers?datespan=' + span + '&sort=date_desc&page=' + mp); await sleep(DELAY);
-              const dd = (j && j.data) || {};
-              // 明細の配列フィールド名は複数の可能性に対応（非公開APIのため防御的に）
-              const items = dd.purchasers || dd.purchase_histories || dd.histories || [];
-              if (!items.length) break;
-              items.forEach((pc) => {
+              const j = await api(purchasersUrl(spanOf(md), mp)); await sleep(DELAY);
+              const r2 = readItems(j);
+              if (!r2.items.length) break;
+              r2.items.forEach((pc) => {
                 if (pc.is_refund) return; // 返金分は数えない
                 const price = Number(pc.price) || 0;
                 const k = (pc.content && pc.content.key) || pc.purchase_content_key || '';
@@ -1547,12 +1558,12 @@ window.noteAnalyze = async function (opts) {
                   if (!ent.name && pc.content && pc.content.name) ent.name = pc.content.name;
                 }
               });
-              if (dd.last_page || dd.isLastPage || mp > 40) break;
+              if (r2.dd.last_page || r2.dd.isLastPage || mp > 40) break;
               mp++;
             }
             monthly.push({ ym: md.getFullYear() + '/' + (md.getMonth() + 1), count: mCnt, amount: mAmt });
           }
-          if (hasPaid || totalCnt > 0) sales = { summary: salesSummary, monthly, byArt, count: totalCnt, amount: totalAmt, hasPaid };
+          if (hasPaid || totalCnt > 0) sales = { monthly, byArt, count: totalCnt, amount: totalAmt, hasPaid };
         }
       } catch (e) { sales = null; }
     }

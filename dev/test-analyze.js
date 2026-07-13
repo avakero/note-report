@@ -56,9 +56,9 @@ global.fetch = async (u) => {
     }
     return json({ likes: [] });
   }
-  // 売上なしアカウント: サマリーは404（有料記事もないので purchasers は呼ばれない想定）
-  if (u.startsWith('/api/v1/stats/sales') || u.startsWith('/api/v1/stats/purchasers')) {
-    return { ok: false, status: 404 };
+  // 売上なしアカウント: 明細は空（機能追加版では直近2か月の様子見だけで打ち切られる想定）
+  if (u.startsWith('/api/v1/stats/purchasers')) {
+    return json({ last_page: true, purchasers: [] });
   }
   throw new Error('unexpected url: ' + u);
 };
@@ -188,10 +188,9 @@ let captured = null;
         ],
       } }) };
     }
-    if (u.startsWith('/api/v1/stats/sales')) {
-      return { ok: true, status: 200, json: async () => ({ data: { total_price: 1800 } }) };
-    }
     if (u.startsWith('/api/v1/stats/purchasers')) {
+      // month=true と filter= が無いと実APIは400を返す（2026-07-13確認）
+      if (!u.includes('month=true') || !u.includes('filter=')) throw new Error('purchasers: missing required params: ' + u);
       const span = (u.match(/datespan=(\d{6})/) || [])[1];
       const page = (u.match(/page=(\d+)/) || [])[1];
       if (span === span9 && page === '1') {

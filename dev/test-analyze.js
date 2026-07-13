@@ -260,5 +260,65 @@ let captured = null;
   delete window.__NOTE_PLUS;
   global.fetch = origFetch;
   console.log('run11 (パスワード再確認が必要: 案内表示) OK');
+
+  // --- 実行12回目: お知らせ枠の出し分け（基本版には出す／機能追加版には出さない） ---
+  // 帯の文言は noteAnalyze の内部でHTMLに差し込まれるため、
+  // ①どのnoticeファイルを取りに行ったか（優先順位）と ②帯のぶんHTMLが伸びたか の2点で確認する。
+  let noticeLog = [];
+  const noticeMock = (opts) => async (u) => {
+    if (u.indexOf('notice') >= 0) {
+      noticeLog.push(u.replace(/^.*\//, '').replace(/\?.*$/, ''));
+      if (u.includes('notice-collab-plus.json')) {
+        return opts.plusFile
+          ? { ok: true, json: async () => ({ enabled: false, message: '（＋の人には出さない）' }) }
+          : { ok: false, status: 404 };
+      }
+      if (u.includes('notice-collab.json')) {
+        return { ok: true, json: async () => ({ enabled: true, message: '乗り換え案内', link: 'https://lin.ee/example', linkText: 'LINEへ' }) };
+      }
+      return { ok: true, json: async () => ({ enabled: true, message: '共通のお知らせ' }) };
+    }
+    return origFetch(u);
+  };
+  window.__NOTE_BASE = 'https://example.test/';
+  window.__NOTE_CHANNEL = 'collab';
+
+  // 帯なしのときのHTML長 = レポート本体 + AI相談枠（noteAnalyze はこの2つを必ず足す）。
+  // 帯が出るとこれより長くなる。
+  const noBannerLen = () => realBuild(captured).length + window.__noteAISection(captured).length;
+
+  // 12a: 基本版 → notice-collab.json を読み、帯が出る（＝HTMLが伸びる）
+  delete window.__NOTE_PLUS;
+  noticeLog = [];
+  global.fetch = noticeMock({ plusFile: true });
+  localStorage.setItem('noteAnalyzeLastRun', '0');
+  const r12a = await window.noteAnalyze({ download: false, delay: 0 });
+  if (noticeLog.join(',') !== 'notice-collab.json') throw new Error('run12a: unexpected notice fetches: ' + noticeLog.join(','));
+  if (r12a.htmlLen <= noBannerLen()) throw new Error('run12a: banner should be injected for basic users');
+  console.log('run12a (基本版: 乗り換え案内の帯が出る) OK');
+
+  // 12b: 機能追加版 → notice-collab-plus.json（enabled:false）が優先され、帯は出ない
+  window.__NOTE_PLUS = true;
+  noticeLog = [];
+  global.fetch = noticeMock({ plusFile: true });
+  localStorage.setItem('noteAnalyzeLastRun', '0');
+  const r12b = await window.noteAnalyze({ download: false, delay: 0 });
+  if (noticeLog.join(',') !== 'notice-collab-plus.json') throw new Error('run12b: plus file must win and stop the lookup: ' + noticeLog.join(','));
+  if (r12b.htmlLen !== noBannerLen()) throw new Error('run12b: banner must NOT be shown to plus users');
+  console.log('run12b (機能追加版: 乗り換え案内は出ない) OK');
+
+  // 12c: plus用ファイルが無い（404）ときは今までどおり notice-collab.json に落ちる
+  noticeLog = [];
+  global.fetch = noticeMock({ plusFile: false });
+  localStorage.setItem('noteAnalyzeLastRun', '0');
+  const r12c = await window.noteAnalyze({ download: false, delay: 0 });
+  if (noticeLog.join(',') !== 'notice-collab-plus.json,notice-collab.json') throw new Error('run12c: should fall back to channel notice: ' + noticeLog.join(','));
+  if (r12c.htmlLen <= noBannerLen()) throw new Error('run12c: fallback banner missing');
+  console.log('run12c (plus用ファイルなし: 従来どおりチャンネル用に落ちる) OK');
+
+  delete window.__NOTE_PLUS;
+  delete window.__NOTE_CHANNEL;
+  delete window.__NOTE_BASE;
+  global.fetch = origFetch;
   console.log('ALL OK');
 })().catch((e) => { console.error('FAIL:', e); process.exit(1); });

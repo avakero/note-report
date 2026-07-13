@@ -1684,21 +1684,24 @@ window.noteAnalyze = async function (opts) {
     } catch (e) {}
 
     // お知らせ枠（GitHub上のnotice.jsonを毎回読む＝遠隔で更新できる）
-    // ローダーが __NOTE_CHANNEL を設定している配布経路では notice-チャンネル名.json を優先。
-    // チャンネル用ファイルが存在すればそれが正（enabled:false ならそのチャンネルは非表示）、
-    // 存在しない（404）ときだけ共通の notice.json を読む。
+    // 読む順番（先に見つかったものが正・enabled:false ならその人には出さない）:
+    //   1. notice-<チャンネル>-plus.json … 機能追加版の人だけ（__NOTE_PLUS のとき）
+    //   2. notice-<チャンネル>.json      … そのチャンネルの人
+    //   3. notice.json                   … 共通
+    // 1 があると「機能追加版への乗り換え案内」を、すでに乗り換えた人に出さずに済む。
+    // ファイルを置かなければ（404）そのまま次の候補に落ちるので、置くまでは今までどおり。
     let notice = null;
     try {
       if (window.__NOTE_BASE) {
-        if (window.__NOTE_CHANNEL) {
+        const names = [];
+        if (window.__NOTE_CHANNEL && window.__NOTE_PLUS) names.push('notice-' + window.__NOTE_CHANNEL + '-plus.json');
+        if (window.__NOTE_CHANNEL) names.push('notice-' + window.__NOTE_CHANNEL + '.json');
+        names.push('notice.json');
+        for (let ni = 0; ni < names.length && !notice; ni++) {
           try {
-            const cr = await fetch(window.__NOTE_BASE + 'notice-' + window.__NOTE_CHANNEL + '.json?t=' + Date.now(), { cache: 'no-store' });
-            if (cr.ok) notice = await cr.json();
+            const nr = await fetch(window.__NOTE_BASE + names[ni] + '?t=' + Date.now(), { cache: 'no-store' });
+            if (nr.ok) notice = await nr.json();
           } catch (e2) {}
-        }
-        if (!notice) {
-          const nr = await fetch(window.__NOTE_BASE + 'notice.json?t=' + Date.now(), { cache: 'no-store' });
-          if (nr.ok) notice = await nr.json();
         }
       }
     } catch (e) {}

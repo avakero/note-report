@@ -236,5 +236,29 @@ let captured = null;
   if (html10.includes('有料noteの売上')) throw new Error('run10: sales section should be hidden in normal version');
   global.fetch = origFetch;
   console.log('run10 (通常版: 売上は機能追加版限定) OK');
+
+  // --- 実行11回目: 売上APIが user_verification_needed（パスワード再確認）→ 案内を出す ---
+  window.__NOTE_PLUS = true;
+  global.fetch = async (u) => {
+    if (u.startsWith('/api/v1/stats/purchasers')) {
+      return {
+        ok: false, status: 400,
+        text: async () => '{"error":{"code":"user_verification_needed"}}',
+        json: async () => ({ error: { code: 'user_verification_needed' } }),
+      };
+    }
+    return origFetch(u);
+  };
+  localStorage.setItem('noteAnalyzeLastRun', '0');
+  await window.noteAnalyze({ download: false, delay: 0 });
+  if (!captured.sales || captured.sales.needVerify !== true) throw new Error('run11: needVerify not detected');
+  const html11 = realBuild(captured);
+  if (!html11.includes('パスワードの再確認')) throw new Error('run11: verification guidance missing');
+  if (html11.includes('直近12か月の売上')) throw new Error('run11: should not render KPI when unverified');
+  const ai11 = window.__noteAISection(captured);
+  if (ai11.includes('有料noteの売上')) throw new Error('run11: AI prompt should not include sales line');
+  delete window.__NOTE_PLUS;
+  global.fetch = origFetch;
+  console.log('run11 (パスワード再確認が必要: 案内表示) OK');
   console.log('ALL OK');
 })().catch((e) => { console.error('FAIL:', e); process.exit(1); });

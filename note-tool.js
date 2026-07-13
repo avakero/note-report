@@ -923,7 +923,12 @@ window.__noteBuildHtml = function (d) {
   /* ③c 有料noteの売上（データがある人にだけ表示） */
   var sales = d.sales || null;
   var salesHtml = "";
-  if (sales) {
+  if (sales && sales.needVerify) {
+    /* noteが「パスワードの再確認」を求めている状態（お金まわりの安全機能）。
+       確認を通してから作り直せば売上が出る、と案内するだけ。 */
+    salesHtml = '<div class="card"><p class="empty">🔒 売上データは、noteの安全のしくみで <b>パスワードの再確認</b> が必要な状態でした。<br>' +
+      '<a href="https://note.com/dashboard/sales" target="_blank" rel="noopener" style="color:#0f9d63;font-weight:700">noteの「売上管理」ページ</a> を開いてパスワードを入力し、売上が表示される状態にしてから、もう一度このレポートを作ってね🐸</p></div>';
+  } else if (sales) {
     var yen = function (n) { return "&yen;" + num(Math.round(Number(n) || 0)); };
     var mons = Array.isArray(sales.monthly) ? sales.monthly : [];
     var thisM = mons.length ? mons[mons.length - 1] : null;
@@ -1425,11 +1430,14 @@ window.noteAnalyze = async function (opts) {
   const UI = window.__noteUI;
   UI.mount();
 
-  const api = async (u) => {
+  // 売上APIは「パスワードの再確認」が済んでいないと 400 + user_verification_needed を返す。
+  // その場合だけ呼び出し側に知らせて、レポートに案内を出す（他のAPIは従来どおり null）。
+  let needVerify = false;
+  const api = async (u, hdrs) => {
     if (reqCount >= MAX_REQUESTS) throw new Error('CAP');
     for (let attempt = 0; attempt < 4; attempt++) {
       try {
-        const r = await fetch(u, { credentials: 'include' });
+        const r = await fetch(u, hdrs ? { credentials: 'include', headers: hdrs } : { credentials: 'include' });
         reqCount++;
         if (r.status === 429 || r.status === 503) {
           backoffHit = true;
@@ -1437,7 +1445,15 @@ window.noteAnalyze = async function (opts) {
           await sleep(2500 * (attempt + 1));
           continue;
         }
-        if (!r.ok) return null;
+        if (!r.ok) {
+          if (r.status === 400) {
+            try {
+              const t = await r.text();
+              if (t.indexOf('user_verification_needed') >= 0) needVerify = true;
+            } catch (e2) {}
+          }
+          return null;
+        }
         return await r.json();
       } catch (e) { await sleep(1000 * (attempt + 1)); }
     }
@@ -1522,6 +1538,13 @@ window.noteAnalyze = async function (opts) {
         const hasPaid = arts.some((a) => (a.price || 0) > 0);
         const spanOf = (d2) => '' + d2.getFullYear() + String(d2.getMonth() + 1).padStart(2, '0');
         const purchasersUrl = (span, pg) => '/api/v1/stats/purchasers?datespan=' + span + '&month=true&sort=date_desc&filter=&page=' + pg;
+        // 売上管理画面は全リクエストに XHR ヘッダー＋XSRFトークン（Cookie）を付けて呼んでいる。
+        // これが無いと400が返るため同じものを付ける（このAPIの呼び出しに限定）。
+        const salesHdrs = { 'x-requested-with': 'XMLHttpRequest' };
+        try {
+          const xsrf = decodeURIComponent((document.cookie.match(/XSRF-TOKEN=([^;]+)/) || [])[1] || '');
+          if (xsrf) salesHdrs['x-xsrf-token'] = xsrf;
+        } catch (e2) {}
         const readItems = (j) => {
           const dd = (j && j.data) || {};
           // 明細の配列フィールド名は複数の可能性に対応（非公開APIのため防御的に）
@@ -1533,7 +1556,7 @@ window.noteAnalyze = async function (opts) {
         let proceed = hasPaid;
         for (let pi = 0; pi < 2 && !proceed; pi++) {
           const pd = new Date(nowD.getFullYear(), nowD.getMonth() - pi, 1);
-          const j = await api(purchasersUrl(spanOf(pd), 1)); await sleep(DELAY);
+          const j = await api(purchasersUrl(spanOf(pd), 1), salesHdrs); await sleep(DELAY);
           if (readItems(j).items.length) proceed = true;
         }
         if (proceed) {
@@ -1544,7 +1567,7 @@ window.noteAnalyze = async function (opts) {
             const md = new Date(nowD.getFullYear(), nowD.getMonth() - mi, 1);
             let mp = 1, mCnt = 0, mAmt = 0;
             while (true) {
-              const j = await api(purchasersUrl(spanOf(md), mp)); await sleep(DELAY);
+              const j = await api(purchasersUrl(spanOf(md), mp), salesHdrs); await sleep(DELAY);
               const r2 = readItems(j);
               if (!r2.items.length) break;
               r2.items.forEach((pc) => {
@@ -1565,7 +1588,9 @@ window.noteAnalyze = async function (opts) {
           }
           if (hasPaid || totalCnt > 0) sales = { monthly, byArt, count: totalCnt, amount: totalAmt, hasPaid };
         }
-      } catch (e) { sales = null; }
+        // パスワード再確認が必要なせいで読めなかった場合は、その案内だけを出す
+        if (!sales && needVerify) sales = { needVerify: true };
+      } catch (e) { sales = needVerify ? { needVerify: true } : null; }
     }
 
     // 3) 各記事のスキ

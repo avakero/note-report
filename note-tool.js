@@ -925,9 +925,14 @@ window.__noteBuildHtml = function (d) {
   var salesHtml = "";
   if (sales && sales.needVerify) {
     /* noteが「パスワードの再確認」を求めている状態（お金まわりの安全機能）。
-       確認を通してから作り直せば売上が出る、と案内するだけ。 */
-    salesHtml = '<div class="card"><p class="empty">🔒 売上データは、noteの安全のしくみで <b>パスワードの再確認</b> が必要な状態でした。<br>' +
-      '<a href="https://note.com/dashboard/sales" target="_blank" rel="noopener" style="color:#0f9d63;font-weight:700">noteの「売上管理」ページ</a> を開いてパスワードを入力し、売上が表示される状態にしてから、もう一度このレポートを作ってね🐸</p></div>';
+       確認を通してから作り直せば売上が出る、と案内するだけ。
+       ※ダッシュボード内はnote側の設定でブックマークが動かないので、
+         「パスワードを入れたあと、別のページに移ってから実行」まで案内する。 */
+    salesHtml = '<div class="card"><p class="empty">🔒 売上データを見るには、noteの安全のしくみで <b>パスワードの再確認</b> が必要でした。次の順番でどうぞ🐸<br><br>' +
+      '① <a href="https://note.com/dashboard/sales" target="_blank" rel="noopener" style="color:#0f9d63;font-weight:700">noteの「販売履歴」ページ</a> を開いて、パスワードを入力する（売上が表示される状態にする）<br>' +
+      '② <b>noteのトップページか自分のプロフィールページに移動する</b>（ダッシュボードの中ではブックマークが動かないので、ここが大事！）<br>' +
+      '③ そのページで、もう一度ブックマークを押してレポートを作る<br><br>' +
+      '※パスワードの確認は時間がたつとまた必要になることがあります。そのときは同じ手順でどうぞ。</p></div>';
   } else if (sales) {
     var yen = function (n) { return "&yen;" + num(Math.round(Number(n) || 0)); };
     var mons = Array.isArray(sales.monthly) ? sales.monthly : [];
@@ -968,7 +973,7 @@ window.__noteBuildHtml = function (d) {
     salesHtml = '<div class="kpis">' + sKpiHtml + "</div>" +
       '<div class="card" style="margin-top:14px"><h3 style="margin:0 0 10px;font-size:14.5px">📆 月別の売上（直近12か月）</h3>' + barChart(monItems, "f-sun") + "</div>" +
       '<div class="tblwrap" style="margin-top:14px"><table style="min-width:520px"><tr><th>有料note・商品</th><th class="n">価格</th><th class="n">販売数</th><th class="n">売上</th></tr>' + salesRows + "</table></div>" +
-      '<p class="note">金額は販売価格ベース（プラットフォーム利用料などが引かれる前）で、返金分は除いています。正確な振込額はnoteの「売上管理」画面で確認してね。</p>' +
+      '<p class="note">金額は販売価格ベース（プラットフォーム利用料などが引かれる前）で、返金分は除いています。正確な振込額はnoteの「売上管理」画面で確認してね。定期購読マガジン・メンバーシップの売上はここには含まれません。</p>' +
       frogTip("売上はあなただけの大事なデータ。レポートを誰かに見せたりスクショするときは、この欄が写っていないか確認してね🐸");
   }
 

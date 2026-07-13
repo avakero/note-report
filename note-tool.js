@@ -495,6 +495,7 @@ window.__noteBuildHtml = function (d) {
     return {
       key: a.key, title: a.title || "(無題)", dt: dt,
       read: read, like: like, cmt: cmt, rate: rate,
+      price: Number(a.price) || 0,
       tags: Array.isArray(a.tags) ? a.tags : []
     };
   });
@@ -919,6 +920,53 @@ window.__noteBuildHtml = function (d) {
     }
   })();
 
+  /* ③c 有料noteの売上（データがある人にだけ表示） */
+  var sales = d.sales || null;
+  var salesHtml = "";
+  if (sales) {
+    var yen = function (n) { return "&yen;" + num(Math.round(Number(n) || 0)); };
+    var mons = Array.isArray(sales.monthly) ? sales.monthly : [];
+    var thisM = mons.length ? mons[mons.length - 1] : null;
+    var lastM = mons.length > 1 ? mons[mons.length - 2] : null;
+    var sKpis = [{ label: "直近12か月の売上", v: yen(sales.amount), sub: "販売 " + num(sales.count) + " 件" }];
+    if (thisM) sKpis.push({ label: "今月の売上", v: yen(thisM.amount), sub: "販売 " + num(thisM.count) + " 件" });
+    if (lastM) sKpis.push({ label: "先月の売上", v: yen(lastM.amount), sub: "販売 " + num(lastM.count) + " 件" });
+    var sKpiHtml = sKpis.map(function (k) {
+      return '<div class="kpi"><div class="kpi-label">' + k.label + '</div><div class="kpi-v">' + k.v + "</div>" +
+        (k.sub ? '<div class="kpi-sub">' + k.sub + "</div>" : "") + "</div>";
+    }).join("");
+    var monItems = mons.map(function (m) { return { label: m.ym, v: Number(m.amount) || 0 }; });
+    /* 商品テーブル: 有料記事＋（記事一覧に無い）購入された商品をまとめる */
+    var byArt = sales.byArt || {};
+    var items = [];
+    var seenKeys = {};
+    arts.forEach(function (a) {
+      var s = byArt[a.key];
+      if ((a.price || 0) > 0 || s) {
+        items.push({ title: a.title, price: a.price || 0, count: s ? s.count : 0, amount: s ? s.amount : 0 });
+        seenKeys[a.key] = 1;
+      }
+    });
+    Object.keys(byArt).forEach(function (k) {
+      if (seenKeys[k]) return;
+      var s = byArt[k];
+      items.push({ title: s.name || "（マガジン・その他の商品）", price: null, count: s.count, amount: s.amount });
+    });
+    items.sort(function (a, b) { return (b.amount - a.amount) || (b.count - a.count) || ((b.price || 0) - (a.price || 0)); });
+    var salesRows = items.map(function (it) {
+      return "<tr><td class='ttl'>" + esc(it.title) + "</td>" +
+        "<td class='n'>" + (it.price == null ? "&minus;" : yen(it.price)) + "</td>" +
+        "<td class='n'>" + num(it.count) + "</td>" +
+        "<td class='n'>" + yen(it.amount) + "</td></tr>";
+    }).join("");
+    if (!salesRows) salesRows = '<tr><td colspan="4" class="empty">この12か月の販売はまだないみたい。これからが楽しみ！🌱</td></tr>';
+    salesHtml = '<div class="kpis">' + sKpiHtml + "</div>" +
+      '<div class="card" style="margin-top:14px"><h3 style="margin:0 0 10px;font-size:14.5px">📆 月別の売上（直近12か月）</h3>' + barChart(monItems, "f-sun") + "</div>" +
+      '<div class="tblwrap" style="margin-top:14px"><table style="min-width:520px"><tr><th>有料note・商品</th><th class="n">価格</th><th class="n">販売数</th><th class="n">売上</th></tr>' + salesRows + "</table></div>" +
+      '<p class="note">金額は販売価格ベース（プラットフォーム利用料などが引かれる前）で、返金分は除いています。正確な振込額はnoteの「売上管理」画面で確認してね。</p>' +
+      frogTip("売上はあなただけの大事なデータ。レポートを誰かに見せたりスクショするときは、この欄が写っていないか確認してね🐸");
+  }
+
   var secNo = 0;
   function secTitle(t, sub) {
     secNo++;
@@ -1047,6 +1095,11 @@ window.__noteBuildHtml = function (d) {
       secTitle("📈 前回とくらべて — 伸びチェック", "noteは記事ごとの日別PVを公開していないので、レポートを作るたびに数字を記録して差分を出す方式だよ。") +
       diffHtml) +
 
+    /* ③c 有料noteの売上（有料記事・売上がある人のみ／コラボ基本版では非表示） */
+    (d.liteMode || !salesHtml ? "" :
+      secTitle("💰 有料noteの売上（直近12か月）", "あなたにだけ見える販売データ。がんばりがお金にもつながってるか、ここでチェック！") +
+      salesHtml) +
+
     /* ④ 時間帯・曜日 */
     secTitle("💛 スキが集まる時間帯・曜日", "読者さんが反応してくれている時間。ピークのちょっと前が投稿の狙い目！") +
     '<div class="twocol"><div class="card"><h3 style="margin:0 0 10px;font-size:14.5px">🕒 時間帯別（スキ件数）</h3>' + barChart(hourItems, "f-green") + "</div>" +
@@ -1147,6 +1200,9 @@ window.__noteAISection = function (d) {
   L.push('- 合計コメント: ' + (d.totCmt || 0));
   if (hasPV && d.totPV > 0) {
     L.push('- 全体スキ率(スキ÷ビュー): ' + pct(d.totLike || 0, d.totPV));
+  }
+  if (d.sales && d.sales.count > 0) {
+    L.push('- 有料noteの売上(直近12か月・返金除く): ' + d.sales.amount + '円（販売' + d.sales.count + '件）');
   }
   L.push('');
 
@@ -1427,6 +1483,7 @@ window.noteAnalyze = async function (opts) {
       (j.data.contents || []).forEach((c) => arts.push({
         key: c.key, title: c.name, publishAt: c.publishAt,
         like: c.likeCount || 0, comment: c.commentCount || 0,
+        price: Number(c.price) || 0,
         read: (pv[c.key] != null ? pv[c.key] : null),
         tags: (c.hashtags || []).map((h) => h.hashtag && h.hashtag.name).filter(Boolean)
       }));
@@ -1444,6 +1501,61 @@ window.noteAnalyze = async function (opts) {
     const followerPages = Math.max(1, Math.ceil(followerTotal / 12));
     const estReq = reqCount + likePages + followerPages + 2;
     DELAY = estReq <= 80 ? 150 : estReq <= 250 ? 300 : estReq <= 600 ? 500 : 800;
+
+    // 配布チャンネルによる機能の出し分け:
+    // コラボ基本版（__NOTE_CHANNEL='collab' かつ __NOTE_PLUS なし）では
+    // 新機能セクションを表示しない方針（最初に複製した版と同じ見た目を保つ）。
+    const liteMode = (window.__NOTE_CHANNEL === 'collab' && !window.__NOTE_PLUS);
+
+    // 2.6) 有料noteの売上（有料記事がある人・売上がある人にだけ出る）
+    // noteの「売上管理」画面が内部で使っているAPIを利用:
+    //   /api/v1/stats/sales                       … 売上サマリー
+    //   /api/v1/stats/purchasers?datespan=YYYYMM  … 月別の購入明細（ページング）
+    // 非公開APIなので形が変わる可能性がある。読めなかったときは
+    // 売上セクションを出さないだけで、レポート本体は止めない。
+    // 【出し分け】機能追加版（__NOTE_PLUS 付きの設置ページ）限定。
+    // 通常版（わくわく版）・コラボ基本版では表示せず、取得ごとスキップする。
+    let sales = null;
+    if (window.__NOTE_PLUS) {
+      try {
+        const hasPaid = arts.some((a) => (a.price || 0) > 0);
+        const sj = await api('/api/v1/stats/sales'); await sleep(DELAY);
+        const salesSummary = (sj && sj.data) || null;
+        if (hasPaid || salesSummary) {
+          UI.status('売上を確認しています…', '有料noteの販売データ', null);
+          const monthly = [], byArt = {};
+          let totalCnt = 0, totalAmt = 0;
+          const nowD = new Date();
+          for (let mi = 11; mi >= 0; mi--) {  // 今月をふくむ直近12か月
+            const md = new Date(nowD.getFullYear(), nowD.getMonth() - mi, 1);
+            const span = '' + md.getFullYear() + String(md.getMonth() + 1).padStart(2, '0');
+            let mp = 1, mCnt = 0, mAmt = 0;
+            while (true) {
+              const j = await api('/api/v1/stats/purchasers?datespan=' + span + '&sort=date_desc&page=' + mp); await sleep(DELAY);
+              const dd = (j && j.data) || {};
+              // 明細の配列フィールド名は複数の可能性に対応（非公開APIのため防御的に）
+              const items = dd.purchasers || dd.purchase_histories || dd.histories || [];
+              if (!items.length) break;
+              items.forEach((pc) => {
+                if (pc.is_refund) return; // 返金分は数えない
+                const price = Number(pc.price) || 0;
+                const k = (pc.content && pc.content.key) || pc.purchase_content_key || '';
+                mCnt++; mAmt += price; totalCnt++; totalAmt += price;
+                if (k) {
+                  const ent = byArt[k] = byArt[k] || { count: 0, amount: 0, name: null };
+                  ent.count++; ent.amount += price;
+                  if (!ent.name && pc.content && pc.content.name) ent.name = pc.content.name;
+                }
+              });
+              if (dd.last_page || dd.isLastPage || mp > 40) break;
+              mp++;
+            }
+            monthly.push({ ym: md.getFullYear() + '/' + (md.getMonth() + 1), count: mCnt, amount: mAmt });
+          }
+          if (hasPaid || totalCnt > 0) sales = { summary: salesSummary, monthly, byArt, count: totalCnt, amount: totalAmt, hasPaid };
+        }
+      } catch (e) { sales = null; }
+    }
 
     // 3) 各記事のスキ
     let allLikes = [];
@@ -1574,14 +1686,12 @@ window.noteAnalyze = async function (opts) {
       }
     } catch (e) {}
 
-    // 配布チャンネルによる機能の出し分け:
-    // コラボ基本版（__NOTE_CHANNEL='collab' かつ __NOTE_PLUS なし）では
-    // 「前回とくらべて」「日別スキの推移」セクションを表示しない（最初に複製した版と同じ見た目）。
-    // ただし記録（スナップショット保存）は全チャンネルで行う。
+    // liteMode（コラボ基本版）は 2.6) の手前で判定済み。
+    // 「前回とくらべて」「日別スキの推移」「売上」は liteMode では表示しないが、
+    // 記録（スナップショット保存）は全チャンネルで行う。
     // 機能追加版に乗り換えた日から、それまでに貯まった分もグラフに出せるようにするため。
-    const liteMode = (window.__NOTE_CHANNEL === 'collab' && !window.__NOTE_PLUS);
 
-    const data = { user, meta, hasPV, arts, totLike, totCmt, totPV, nArt, hourC, wdC, dayC, heat, pHeat, uLike, uMeta, uHours, fans, prospects, tagMap, followers, followerCount: followers.size, prevSnap, snapSaved, snapHist, liteMode, credit, nLikes: allLikes.length, heroImg, WD, esc, peak };
+    const data = { user, meta, hasPV, arts, totLike, totCmt, totPV, nArt, hourC, wdC, dayC, heat, pHeat, uLike, uMeta, uHours, fans, prospects, tagMap, followers, followerCount: followers.size, prevSnap, snapSaved, snapHist, liteMode, sales, credit, nLikes: allLikes.length, heroImg, WD, esc, peak };
     let html = window.__noteBuildHtml(data);
     try {
       if (notice && notice.enabled !== false && notice.message) {

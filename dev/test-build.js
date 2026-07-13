@@ -91,5 +91,47 @@ if (!html4.includes('全体サマリー') || !html4.includes('スキが集まる
 if (!html4.includes('<span class="sec-no">3</span>💛')) throw new Error('lite: section numbering should stay sequential');
 console.log('case4 (コラボ基本版・非表示) OK');
 
+// --- ケース5: 売上あり（有料記事＋マガジン・返金除外後の集計値） ---
+const monthly5 = [];
+for (let i = 11; i >= 0; i--) monthly5.push({ ym: '2026/' + (12 - i), count: 0, amount: 0 });
+monthly5[11] = { ym: monthly5[11].ym, count: 3, amount: 1800 }; // 今月
+monthly5[10] = { ym: monthly5[10].ym, count: 1, amount: 500 };  // 先月
+const sales5 = {
+  summary: null,
+  monthly: monthly5,
+  byArt: { a1: { count: 2, amount: 1000, name: '記事その1' }, m1: { count: 2, amount: 1300, name: 'テストマガジン' } },
+  count: 4, amount: 2300, hasPaid: true,
+};
+const artsPaid = arts.map((a) => (a.key === 'a1' ? { ...a, price: 500 } : a));
+let html5 = window.__noteBuildHtml({ ...base, arts: artsPaid, prevSnap: null, snapSaved: true, sales: sales5 });
+for (const needle of [
+  '有料noteの売上',      // セクション見出し
+  '直近12か月の売上',
+  '&yen;2,300',          // 12か月合計
+  '今月の売上',
+  '&yen;1,800',
+  '先月の売上',
+  '&yen;500',            // 先月KPI・a1の価格
+  'テストマガジン',       // 記事一覧にない商品は購入明細のnameで表示
+  '月別の売上',
+  'プラットフォーム利用料', // 手取り額との違いの注記
+]) {
+  if (!html5.includes(needle)) throw new Error('case5 missing: ' + needle);
+}
+console.log('case5 (売上セクション) OK');
+
+// --- ケース5b: 有料記事はあるが売上ゼロ → セクションは出て、空メッセージ ---
+const salesZero = { summary: null, monthly: monthly5.map((m) => ({ ym: m.ym, count: 0, amount: 0 })), byArt: {}, count: 0, amount: 0, hasPaid: true };
+let html5b = window.__noteBuildHtml({ ...base, arts: artsPaid, prevSnap: null, snapSaved: true, sales: salesZero });
+if (!html5b.includes('有料noteの売上')) throw new Error('case5b: section missing');
+if (!html5b.includes('&yen;0')) throw new Error('case5b: zero amount missing');
+console.log('case5b (有料記事あり・売上ゼロ) OK');
+
+// --- ケース6: liteMode では売上も非表示／salesなしでも非表示 ---
+let html6 = window.__noteBuildHtml({ ...base, prevSnap: null, snapSaved: true, sales: sales5, liteMode: true });
+if (html6.includes('有料noteの売上')) throw new Error('case6: lite should hide sales section');
+if (html1.includes('有料noteの売上')) throw new Error('case6: sales section should be hidden without sales data');
+console.log('case6 (売上の出し分け) OK');
+
 fs.writeFileSync(require('path').join(__dirname, 'report-case2.html'), html2);
 console.log('ALL OK');

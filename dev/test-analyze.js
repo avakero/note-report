@@ -56,6 +56,10 @@ global.fetch = async (u) => {
     }
     return json({ likes: [] });
   }
+  // 売上なしアカウント: サマリーは404（有料記事もないので purchasers は呼ばれない想定）
+  if (u.startsWith('/api/v1/stats/sales') || u.startsWith('/api/v1/stats/purchasers')) {
+    return { ok: false, status: 404 };
+  }
   throw new Error('unexpected url: ' + u);
 };
 
@@ -98,6 +102,8 @@ let captured = null;
   for (const needle of ['1日前', '+80', '伸びた記事', '1日ごとのPVの伸び', '1日ごとのスキの伸び']) {
     if (!html.includes(needle)) throw new Error('run3 html missing: ' + needle);
   }
+  if (captured.sales != null) throw new Error('run3: sales should be null without paid articles');
+  if (html.includes('有料noteの売上')) throw new Error('run3: sales section should be hidden');
   console.log('run3 (前日比較) OK');
 
   // --- 実行4回目: 402日ぶんの履歴を仕込む → 400日に収まり、明細は直近30件だけ残る ---
@@ -128,6 +134,7 @@ let captured = null;
   delete store['noteReportSnaps_testuser'];
   await window.noteAnalyze({ download: false, delay: 0 });
   if (captured.liteMode !== true) throw new Error('run5: collab channel should set liteMode');
+  if (captured.sales != null) throw new Error('run5: sales fetch must be skipped in lite mode');
   if (!store['noteReportSnaps_testuser']) throw new Error('run5: snapshot must still be saved in lite mode');
   const html5 = realBuild(captured);
   if (html5.includes('前回とくらべて') || html5.includes('日別スキの推移')) throw new Error('run5: new sections should be hidden');
@@ -167,5 +174,68 @@ let captured = null;
   if (captured.credit != null) throw new Error('run8: credit should be null on 404');
   global.fetch = origFetch;
   console.log('run8 (brandなし: 標準デザインにフォールバック) OK');
+
+  // --- 実行9回目: 機能追加版で有料記事あり＋売上あり → 集計・返金除外・マガジン対応 ---
+  const now9 = new Date();
+  const span9 = '' + now9.getFullYear() + String(now9.getMonth() + 1).padStart(2, '0');
+  const salesMock = async (u) => {
+    if (u.includes('/contents')) {
+      return { ok: true, status: 200, json: async () => ({ data: {
+        isLastPage: true,
+        contents: [
+          { key: 'a1', name: '記事その1', publishAt: '2026-07-01T09:00:00+09:00', likeCount: 30, commentCount: 3, hashtags: [], price: 500 },
+          { key: 'a2', name: '記事その2', publishAt: '2026-07-10T21:00:00+09:00', likeCount: 17, commentCount: 1, hashtags: [] },
+        ],
+      } }) };
+    }
+    if (u.startsWith('/api/v1/stats/sales')) {
+      return { ok: true, status: 200, json: async () => ({ data: { total_price: 1800 } }) };
+    }
+    if (u.startsWith('/api/v1/stats/purchasers')) {
+      const span = (u.match(/datespan=(\d{6})/) || [])[1];
+      const page = (u.match(/page=(\d+)/) || [])[1];
+      if (span === span9 && page === '1') {
+        return { ok: true, status: 200, json: async () => ({ data: { last_page: true, purchasers: [
+          { price: 500, content: { key: 'a1', name: '記事その1' } },
+          { price: 500, content: { key: 'a1', name: '記事その1' } },
+          { price: 300, is_refund: true, content: { key: 'a1', name: '記事その1' } }, // 返金 → 除外
+          { price: 800, purchase_content_key: 'm1' }, // 記事一覧にない商品（マガジン等）
+        ] } }) };
+      }
+      return { ok: true, status: 200, json: async () => ({ data: { last_page: true, purchasers: [] } }) };
+    }
+    return origFetch(u);
+  };
+  global.fetch = salesMock;
+  localStorage.setItem('noteAnalyzeLastRun', '0');
+  await window.noteAnalyze({ download: false, delay: 0 });
+  const s9 = captured.sales;
+  if (!s9) throw new Error('run9: sales missing');
+  if (s9.count !== 3 || s9.amount !== 1800) throw new Error('run9: bad totals ' + JSON.stringify({ count: s9.count, amount: s9.amount }));
+  if (!s9.byArt.a1 || s9.byArt.a1.count !== 2 || s9.byArt.a1.amount !== 1000) throw new Error('run9: bad byArt.a1 ' + JSON.stringify(s9.byArt.a1));
+  if (!s9.byArt.m1 || s9.byArt.m1.count !== 1 || s9.byArt.m1.amount !== 800) throw new Error('run9: bad byArt.m1 ' + JSON.stringify(s9.byArt.m1));
+  if (s9.monthly.length !== 12) throw new Error('run9: expected 12 months, got ' + s9.monthly.length);
+  if (s9.monthly[11].amount !== 1800 || s9.monthly[10].amount !== 0) throw new Error('run9: bad monthly ' + JSON.stringify(s9.monthly.slice(-2)));
+  const html9 = realBuild(captured);
+  for (const needle of ['有料noteの売上', '直近12か月の売上', '&yen;1,800', '（マガジン・その他の商品）']) {
+    if (!html9.includes(needle)) throw new Error('run9 html missing: ' + needle);
+  }
+  // AI相談プロンプト（__noteAISection）にも売上1行が入る
+  const ai9 = window.__noteAISection(captured);
+  if (!ai9.includes('有料noteの売上(直近12か月・返金除く): 1800円（販売3件）')) throw new Error('run9: AI prompt sales line missing');
+  console.log('run9 (機能追加版・売上セクション: 集計・返金除外・マガジン) OK');
+
+  // --- 実行10回目: 通常版（チャンネル・PLUSなし）では有料記事＋売上があっても売上機能は出ない ---
+  delete window.__NOTE_CHANNEL;
+  delete window.__NOTE_PLUS;
+  delete window.__NOTE_BASE;
+  global.fetch = salesMock;
+  localStorage.setItem('noteAnalyzeLastRun', '0');
+  await window.noteAnalyze({ download: false, delay: 0 });
+  if (captured.sales != null) throw new Error('run10: sales must be plus-only');
+  const html10 = realBuild(captured);
+  if (html10.includes('有料noteの売上')) throw new Error('run10: sales section should be hidden in normal version');
+  global.fetch = origFetch;
+  console.log('run10 (通常版: 売上は機能追加版限定) OK');
   console.log('ALL OK');
 })().catch((e) => { console.error('FAIL:', e); process.exit(1); });

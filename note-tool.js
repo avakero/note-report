@@ -29,6 +29,88 @@ window.__noteUI = (function () {
     return (typeof document !== 'undefined' && document) ? document : null;
   }
 
+  /* ---------- レポート内のプロンプトをコピー ----------
+     ボタンのタップは iframe の中で起きる＝フォーカスされている文書も iframe 側。
+     クリップボード許可も execCommand も「フォーカスされた文書」でしか通らないので、
+     コピーは親ではなく iframe の文脈（iwin / idoc）で実行する。 */
+  function copyReportPrompt(iwin, idoc, ta, onDone, onFail) {
+    var nav = (iwin && iwin.navigator) || navigator;
+    var fallback = function () {
+      if (selectAndCopy(iwin, idoc, ta)) { onDone(); } else { onFail(); }
+    };
+    try {
+      if (nav.clipboard && nav.clipboard.writeText) {
+        nav.clipboard.writeText(ta.value).then(onDone, fallback);
+        return;
+      }
+    } catch (e) { /* 下の従来方式へ */ }
+    fallback();
+  }
+
+  /* execCommand("copy") 方式。iOS Safari は readonly な textarea を select() しても
+     コピーできないので、contentEditable にして Range で選択してから実行する。 */
+  function selectAndCopy(iwin, idoc, ta) {
+    var ok = false;
+    var ce = ta.contentEditable;
+    var ro = ta.readOnly;
+    try {
+      ta.contentEditable = 'true';
+      ta.readOnly = false;
+      var range = idoc.createRange();
+      range.selectNodeContents(ta);
+      var sel = iwin.getSelection();
+      if (sel) { sel.removeAllRanges(); sel.addRange(range); }
+      ta.setSelectionRange(0, ta.value.length);
+      ok = idoc.execCommand('copy');
+    } catch (e) { ok = false; }
+    try { ta.contentEditable = ce; ta.readOnly = ro; } catch (e) {}
+    return ok;
+  }
+
+  /* ---------- レポート内「AIに相談」セクションを親から配線 ----------
+     note.com のCSP（script-src に 'strict-dynamic'）により、blob: レポート内の
+     インライン <script> は実行されない。親のJSからDOMを直接触る分にはCSPの
+     対象外なので、チップの切り替えとコピーをここで担当する。 */
+  function wireAISection(idoc, iwin) {
+    var ta = idoc.getElementById('noteai-ta');
+    var copyBtn = idoc.getElementById('noteai-copy');
+    var chipBox = idoc.getElementById('noteai-chips');
+    var baseEl = idoc.getElementById('noteai-base');
+    if (!ta || !copyBtn || !chipBox || !baseEl) return;
+
+    var base = baseEl.value;
+
+    chipBox.addEventListener('click', function (ev) {
+      var b = ev.target;
+      while (b && b !== chipBox && !b.getAttribute('data-noteai-q')) { b = b.parentNode; }
+      if (!b || b === chipBox) return;
+      ta.value = base + b.getAttribute('data-noteai-q');
+      var cs = chipBox.querySelectorAll('.noteai-chip');
+      for (var i = 0; i < cs.length; i++) {
+        if (cs[i] === b) { cs[i].classList.add('noteai-chip-on'); }
+        else { cs[i].classList.remove('noteai-chip-on'); }
+      }
+    });
+
+    var orig = copyBtn.textContent;
+    var reset = function () {
+      copyBtn.textContent = orig;
+      copyBtn.classList.remove('noteai-ok');
+    };
+    copyBtn.addEventListener('click', function () {
+      copyReportPrompt(iwin, idoc, ta, function () {
+        copyBtn.textContent = '✓ コピーしました';
+        copyBtn.classList.add('noteai-ok');
+        setTimeout(reset, 2000);
+      }, function () {
+        // どうしてもコピーできない環境：手で選べるようにして案内する
+        try { ta.removeAttribute('readonly'); ta.focus(); ta.select(); } catch (e) {}
+        copyBtn.textContent = '長押しして「コピー」を選んでね';
+        setTimeout(reset, 4000);
+      });
+    });
+  }
+
   var ui = {
     _root: null,   // オーバーレイのルート要素（存在チェックの基準）
     _refs: null,   // 内部パーツへの参照
@@ -408,8 +490,23 @@ window.__noteUI = (function () {
 
       var frame = d.createElement('iframe');
       frame.setAttribute('title', 'note 分析レポート');
+      frame.setAttribute('allow', 'clipboard-write');
       frame.style.cssText = RESET +
         'flex:1;width:100%;height:100%;border:0;background:#FFFFFF;';
+
+      /* blob: の文書は note.com のCSPを引き継ぐ。note.com の script-src には
+         'strict-dynamic' があるため、nonce のないインライン <script> は実行されない
+         ＝レポート内のAI相談セクション（チップ・コピーボタン）が無反応になる。
+         そこで読み込み後にインラインJSが動いたかを確かめ、動いていなければ
+         親側（すでに実行中でCSPの影響を受けない）のJSから配線し直す。 */
+      frame.onload = function () {
+        try {
+          var iwin = frame.contentWindow;
+          var idoc = frame.contentDocument || (iwin && iwin.document);
+          if (!idoc || !iwin || iwin.__noteaiReady) return;
+          wireAISection(idoc, iwin);
+        } catch (e) { /* 別オリジン等で触れない場合は何もしない */ }
+      };
       frame.src = url;
       wrap.appendChild(frame);
 
@@ -1318,10 +1415,13 @@ window.__noteAISection = function (d) {
   var jsBase = JSON.stringify(basePrompt).replace(/</g, '\\u003c');
   var jsPresets = JSON.stringify(presets).replace(/</g, '\\u003c');
 
-  /* ---------- プリセットチップのHTML ---------- */
+  /* ---------- プリセットチップのHTML ----------
+     data-noteai-q に質問文そのものを持たせる。
+     note.com のCSP（strict-dynamic）でレポート内のインラインJSが実行できない場合、
+     ビューア側（note_ui.js）が親のJSからこの属性を読んで配線し直すため。 */
   var chipsHtml = presets.map(function (p, i) {
     return '<button type="button" class="noteai-chip' + (i === 0 ? ' noteai-chip-on' : '') +
-      '" data-noteai-idx="' + i + '">' + esc(p.label) + '</button>';
+      '" data-noteai-idx="' + i + '" data-noteai-q="' + esc(p.q) + '">' + esc(p.label) + '</button>';
   }).join('');
 
   /* ---------- セクションHTML ---------- */
@@ -1359,6 +1459,7 @@ window.__noteAISection = function (d) {
 '<div class="noteai-sub">聞きたいことを選ぶ（プロンプト末尾の「質問」が切り替わります）</div>' +
 '<div class="noteai-chips" id="noteai-chips">' + chipsHtml + '</div>' +
 '<textarea id="noteai-ta" readonly spellcheck="false">' + esc(initialPrompt) + '</textarea>' +
+'<textarea id="noteai-base" hidden readonly aria-hidden="true">' + esc(basePrompt) + '</textarea>' +
 '<div class="noteai-actions">' +
 '<button type="button" id="noteai-copy">📋 プロンプトをコピー</button>' +
 '<a class="noteai-ai" href="https://chatgpt.com/" target="_blank" rel="noopener">ChatGPT を開く</a>' +
@@ -1386,25 +1487,40 @@ window.__noteAISection = function (d) {
 'if(b&&b!==chipBox){setQ(parseInt(b.getAttribute("data-noteai-idx"),10));}' +
 '});' +
 'var orig=copyBtn.textContent;' +
+'var touch=("ontouchstart" in window)||navigator.maxTouchPoints>0;' +
+'var manual=touch?"長押しして「コピー」を選んでね":"選択したのでCtrl+Cを押してね";' +
 'function done(){' +
 'copyBtn.textContent="\\u2713 コピーしました";' +
 'copyBtn.classList.add("noteai-ok");' +
 'setTimeout(function(){copyBtn.textContent=orig;copyBtn.classList.remove("noteai-ok");},2000);' +
 '}' +
+/* iOS Safari は readonly な textarea の select() では copy できないので
+   contentEditable + Range で選択してから execCommand する */
 'function fallback(){' +
+'var ok=false;' +
 'try{' +
-'ta.removeAttribute("readonly");' +
-'ta.focus();ta.select();ta.setSelectionRange(0,ta.value.length);' +
-'var ok=document.execCommand("copy");' +
-'ta.setAttribute("readonly","readonly");' +
-'if(ok){done();}else{copyBtn.textContent="選択したのでCtrl+Cを押してね";}' +
-'}catch(e){copyBtn.textContent="選択したのでCtrl+Cを押してね";}' +
+'var ce=ta.contentEditable,ro=ta.readOnly;' +
+'ta.contentEditable="true";ta.readOnly=false;' +
+'var r=document.createRange();r.selectNodeContents(ta);' +
+'var s=window.getSelection();s.removeAllRanges();s.addRange(r);' +
+'ta.setSelectionRange(0,ta.value.length);' +
+'ok=document.execCommand("copy");' +
+'ta.contentEditable=ce;ta.readOnly=ro;' +
+'}catch(e){ok=false;}' +
+'if(ok){done();return;}' +
+'try{ta.removeAttribute("readonly");ta.focus();ta.select();}catch(e){}' +
+'copyBtn.textContent=manual;' +
+'setTimeout(function(){copyBtn.textContent=orig;},4000);' +
 '}' +
 'copyBtn.addEventListener("click",function(){' +
+'try{' +
 'if(navigator.clipboard&&navigator.clipboard.writeText){' +
 'navigator.clipboard.writeText(ta.value).then(done,fallback);' +
 '}else{fallback();}' +
+'}catch(e){fallback();}' +
 '});' +
+/* ビューア側（note_ui.js）がこの印を見て、インラインJSが動いたかを判定する */
+'window.__noteaiReady=1;' +
 '})();' +
 '<\/script>' +
 '</section>';

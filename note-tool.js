@@ -1043,6 +1043,20 @@ window.__noteBuildHtml = function (d) {
         (k.sub ? '<div class="kpi-sub">' + k.sub + "</div>" : "") + "</div>";
     }).join("");
     var monItems = mons.map(function (m) { return { label: m.ym, v: Number(m.amount) || 0 }; });
+    /* 日別の売上（最近30日）: 購入明細の日時から集計。日付が読めなかったときは出さない */
+    var dailyMap = sales.daily || null;
+    var dailySalesHtml = "";
+    if (dailyMap) {
+      var sdItems = [];
+      var sd0 = new Date(); sd0.setHours(0, 0, 0, 0);
+      for (var sdi = 29; sdi >= 0; sdi--) {
+        var sdd = new Date(sd0.getTime() - sdi * 86400000);
+        var sdk = sdd.getFullYear() + "-" + ("0" + (sdd.getMonth() + 1)).slice(-2) + "-" + ("0" + sdd.getDate()).slice(-2);
+        var sde = dailyMap[sdk];
+        sdItems.push({ label: (sdd.getMonth() + 1) + "/" + sdd.getDate(), v: sde ? Number(sde.amount) || 0 : 0 });
+      }
+      dailySalesHtml = '<div class="card" style="margin-top:14px"><h3 style="margin:0 0 10px;font-size:14.5px">📅 日別の売上（最近30日）</h3>' + barChart(sdItems, "f-green") + "</div>";
+    }
     /* 商品テーブル: 有料記事＋（記事一覧に無い）購入された商品をまとめる */
     var byArt = sales.byArt || {};
     var items = [];
@@ -1069,8 +1083,9 @@ window.__noteBuildHtml = function (d) {
     if (!salesRows) salesRows = '<tr><td colspan="4" class="empty">この12か月の販売はまだないみたい。これからが楽しみ！🌱</td></tr>';
     salesHtml = '<div class="kpis">' + sKpiHtml + "</div>" +
       '<div class="card" style="margin-top:14px"><h3 style="margin:0 0 10px;font-size:14.5px">📆 月別の売上（直近12か月）</h3>' + barChart(monItems, "f-sun") + "</div>" +
+      dailySalesHtml +
       '<div class="tblwrap" style="margin-top:14px"><table style="min-width:520px"><tr><th>有料note・商品</th><th class="n">価格</th><th class="n">販売数</th><th class="n">売上</th></tr>' + salesRows + "</table></div>" +
-      '<p class="note">金額は販売価格ベース（プラットフォーム利用料などが引かれる前）で、返金分は除いています。正確な振込額はnoteの「売上管理」画面で確認してね。定期購読マガジン・メンバーシップの売上はここには含まれません。</p>' +
+      '<p class="note">金額は販売価格ベース（プラットフォーム利用料などが引かれる前）で、返金分は除いています。日別グラフは購入された日（円）で集計しています。正確な振込額はnoteの「売上管理」画面で確認してね。定期購読マガジン・メンバーシップの売上はここには含まれません。</p>' +
       frogTip("売上はあなただけの大事なデータ。レポートを誰かに見せたりスクショするときは、この欄が写っていないか確認してね🐸");
   }
 
@@ -1682,8 +1697,8 @@ window.noteAnalyze = async function (opts) {
         }
         if (proceed) {
           UI.status('売上を確認しています…', '有料noteの販売データ', null);
-          const monthly = [], byArt = {};
-          let totalCnt = 0, totalAmt = 0;
+          const monthly = [], byArt = {}, daily = {};
+          let totalCnt = 0, totalAmt = 0, dailyOk = false;
           for (let mi = 11; mi >= 0; mi--) {  // 今月をふくむ直近12か月
             const md = new Date(nowD.getFullYear(), nowD.getMonth() - mi, 1);
             let mp = 1, mCnt = 0, mAmt = 0;
@@ -1701,13 +1716,21 @@ window.noteAnalyze = async function (opts) {
                   ent.count++; ent.amount += price;
                   if (!ent.name && pc.content && pc.content.name) ent.name = pc.content.name;
                 }
+                // 日別集計: 明細の購入日時から「日ごとの売上」を作る（追加リクエストなし）。
+                // 日付のフィールド名も非公開APIのため防御的に複数名へ対応。読めない明細は月別のみに数える。
+                const pdt = parseDt(pc.purchase_at || pc.purchased_at || pc.purchase_date || pc.created_at || pc.billed_at || '');
+                if (pdt) {
+                  const dk = pdt.getFullYear() + '-' + String(pdt.getMonth() + 1).padStart(2, '0') + '-' + String(pdt.getDate()).padStart(2, '0');
+                  const de = daily[dk] = daily[dk] || { count: 0, amount: 0 };
+                  de.count++; de.amount += price; dailyOk = true;
+                }
               });
               if (r2.dd.last_page || r2.dd.isLastPage || mp > 40) break;
               mp++;
             }
             monthly.push({ ym: md.getFullYear() + '/' + (md.getMonth() + 1), count: mCnt, amount: mAmt });
           }
-          if (hasPaid || totalCnt > 0) sales = { monthly, byArt, count: totalCnt, amount: totalAmt, hasPaid };
+          if (hasPaid || totalCnt > 0) sales = { monthly, byArt, daily: dailyOk ? daily : null, count: totalCnt, amount: totalAmt, hasPaid };
         }
         // パスワード再確認が必要なせいで読めなかった場合は、その案内だけを出す
         if (!sales && needVerify) sales = { needVerify: true };

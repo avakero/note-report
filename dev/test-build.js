@@ -96,10 +96,14 @@ const monthly5 = [];
 for (let i = 11; i >= 0; i--) monthly5.push({ ym: '2026/' + (12 - i), count: 0, amount: 0 });
 monthly5[11] = { ym: monthly5[11].ym, count: 3, amount: 1800 }; // 今月
 monthly5[10] = { ym: monthly5[10].ym, count: 1, amount: 500 };  // 先月
+const dkey5 = (d) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+const today5 = new Date(); today5.setHours(0, 0, 0, 0);
+const yest5 = new Date(today5.getTime() - 86400000);
 const sales5 = {
   summary: null,
   monthly: monthly5,
   byArt: { a1: { count: 2, amount: 1000, name: '記事その1' }, m1: { count: 2, amount: 1300, name: 'テストマガジン' } },
+  daily: { [dkey5(yest5)]: { count: 1, amount: 800 }, [dkey5(today5)]: { count: 3, amount: 1500 } },
   count: 4, amount: 2300, hasPaid: true,
 };
 const artsPaid = arts.map((a) => (a.key === 'a1' ? { ...a, price: 500 } : a));
@@ -114,10 +118,17 @@ for (const needle of [
   '&yen;500',            // 先月KPI・a1の価格
   'テストマガジン',       // 記事一覧にない商品は購入明細のnameで表示
   '月別の売上',
+  '日別の売上（最近30日）', // 日別グラフ
+  'bar-val">1,500</span>',  // 今日の売上バー
+  'bar-val">800</span>',    // きのうの売上バー
   'プラットフォーム利用料', // 手取り額との違いの注記
 ]) {
   if (!html5.includes(needle)) throw new Error('case5 missing: ' + needle);
 }
+// 日別グラフは30日ぶんのバーが出る（月別12 + 日別30）
+const salesPart5 = html5.split('有料noteの売上')[1].split('有料note・商品')[0];
+const salesBars5 = (salesPart5.match(/bar-row/g) || []).length;
+if (salesBars5 !== 42) throw new Error('case5: expected 42 sales bars (12 monthly + 30 daily), got ' + salesBars5);
 console.log('case5 (売上セクション) OK');
 
 // --- ケース5b: 有料記事はあるが売上ゼロ → セクションは出て、空メッセージ ---
@@ -125,6 +136,7 @@ const salesZero = { summary: null, monthly: monthly5.map((m) => ({ ym: m.ym, cou
 let html5b = window.__noteBuildHtml({ ...base, arts: artsPaid, prevSnap: null, snapSaved: true, sales: salesZero });
 if (!html5b.includes('有料noteの売上')) throw new Error('case5b: section missing');
 if (!html5b.includes('&yen;0')) throw new Error('case5b: zero amount missing');
+if (html5b.includes('日別の売上')) throw new Error('case5b: daily chart should be hidden without daily data');
 console.log('case5b (有料記事あり・売上ゼロ) OK');
 
 // --- ケース6: liteMode では売上も非表示／salesなしでも非表示 ---

@@ -194,11 +194,13 @@ let captured = null;
       const span = (u.match(/datespan=(\d{6})/) || [])[1];
       const page = (u.match(/page=(\d+)/) || [])[1];
       if (span === span9 && page === '1') {
+        // オフセットなし＝ローカル時刻として解釈されるので、テスト実行環境のTZに関係なく「今日」に入る
+        const iso9 = (d) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0') + 'T12:00:00';
         return { ok: true, status: 200, json: async () => ({ data: { last_page: true, purchasers: [
-          { price: 500, content: { key: 'a1', name: '記事その1' } },
-          { price: 500, content: { key: 'a1', name: '記事その1' } },
-          { price: 300, is_refund: true, content: { key: 'a1', name: '記事その1' } }, // 返金 → 除外
-          { price: 800, purchase_content_key: 'm1' }, // 記事一覧にない商品（マガジン等）
+          { price: 500, created_at: iso9(now9), content: { key: 'a1', name: '記事その1' } },
+          { price: 500, created_at: iso9(now9), content: { key: 'a1', name: '記事その1' } },
+          { price: 300, is_refund: true, created_at: iso9(now9), content: { key: 'a1', name: '記事その1' } }, // 返金 → 除外
+          { price: 800, purchase_content_key: 'm1' }, // 記事一覧にない商品（マガジン等）・日付なしでも壊れない
         ] } }) };
       }
       return { ok: true, status: 200, json: async () => ({ data: { last_page: true, purchasers: [] } }) };
@@ -215,8 +217,13 @@ let captured = null;
   if (!s9.byArt.m1 || s9.byArt.m1.count !== 1 || s9.byArt.m1.amount !== 800) throw new Error('run9: bad byArt.m1 ' + JSON.stringify(s9.byArt.m1));
   if (s9.monthly.length !== 12) throw new Error('run9: expected 12 months, got ' + s9.monthly.length);
   if (s9.monthly[11].amount !== 1800 || s9.monthly[10].amount !== 0) throw new Error('run9: bad monthly ' + JSON.stringify(s9.monthly.slice(-2)));
+  // 日別集計: 返金と日付なしの明細は入らない（日付なしは月別のみ）
+  const dk9 = now9.getFullYear() + '-' + String(now9.getMonth() + 1).padStart(2, '0') + '-' + String(now9.getDate()).padStart(2, '0');
+  if (!s9.daily || !s9.daily[dk9]) throw new Error('run9: daily missing: ' + JSON.stringify(s9.daily));
+  if (s9.daily[dk9].count !== 2 || s9.daily[dk9].amount !== 1000) throw new Error('run9: bad daily ' + JSON.stringify(s9.daily[dk9]));
+  if (Object.keys(s9.daily).length !== 1) throw new Error('run9: unexpected daily keys ' + JSON.stringify(Object.keys(s9.daily)));
   const html9 = realBuild(captured);
-  for (const needle of ['有料noteの売上', '直近12か月の売上', '&yen;1,800', '（マガジン・その他の商品）']) {
+  for (const needle of ['有料noteの売上', '直近12か月の売上', '&yen;1,800', '（マガジン・その他の商品）', '日別の売上（最近30日）', 'bar-val">1,000</span>']) {
     if (!html9.includes(needle)) throw new Error('run9 html missing: ' + needle);
   }
   // AI相談プロンプト（__noteAISection）にも売上1行が入る

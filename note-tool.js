@@ -816,6 +816,26 @@ window.__noteBuildHtml = function (d) {
     return '<div class="frog-tip"><span class="frog-face">🐸</span><span class="frog-bubble">' + msg + '</span></div>';
   }
 
+  /* 他の人の名前は初期表示を伏せ字にする（本人がボタンを押したときだけ見える）。
+     絵文字入りの名前でも壊れないように、1文字目はコードポイント単位で取り出す。 */
+  function maskNm(s2) {
+    var t = String(s2 == null ? "" : s2);
+    if (!t) return "（名前なし）";
+    var head = (typeof Array.from === "function" ? Array.from(t)[0] : t.charAt(0)) || "";
+    return head + "***";
+  }
+  /* 伏せ字と本名の両方をHTMLに入れておき、CSS（チェックボックス）だけで切り替える。
+     ※レポート内のインラインJSはスマホ表示（iframe）だとnoteのCSPで動かないので、JSは使わない。 */
+  function nmCell(name, urlname, guest) {
+    if (guest) return '<span class="nm-m">ゲスト</span><span class="nm-r">ゲスト購入（お名前は出ません）</span>';
+    var m = '<span class="nm-m">' + esc(maskNm(name)) + "</span>";
+    var label = esc(name || urlname || "（名前なし）");
+    var r = urlname
+      ? '<a class="nm-r" href="https://note.com/' + esc(urlname) + '" target="_blank" rel="noopener">' + label + "</a>"
+      : '<span class="nm-r">' + label + "</span>";
+    return m + r;
+  }
+
   /* ---------- セクション生成 ---------- */
   var now = new Date();
   var genAt = now.toLocaleString("ja-JP", { year: "numeric", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
@@ -1073,6 +1093,10 @@ window.__noteBuildHtml = function (d) {
       var s = byArt[k];
       items.push({ title: s.name || "（マガジン・その他の商品）", price: null, count: s.count, amount: s.amount });
     });
+    /* チップ（応援）は記事・マガジンとは別物なので1行にまとめて出す（合計が売上KPIと合うように） */
+    if ((sales.tipCount || 0) > 0) {
+      items.push({ title: "💝 チップ（応援）", price: null, count: sales.tipCount, amount: sales.tipAmount || 0 });
+    }
     items.sort(function (a, b) { return (b.amount - a.amount) || (b.count - a.count) || ((b.price || 0) - (a.price || 0)); });
     var salesRows = items.map(function (it) {
       return "<tr><td class='ttl'>" + esc(it.title) + "</td>" +
@@ -1081,12 +1105,61 @@ window.__noteBuildHtml = function (d) {
         "<td class='n'>" + yen(it.amount) + "</td></tr>";
     }).join("");
     if (!salesRows) salesRows = '<tr><td colspan="4" class="empty">この12か月の販売はまだないみたい。これからが楽しみ！🌱</td></tr>';
+    /* 💝 チップをくれた人 / 🛒 買ってくれた人（初期表示は伏せ字。ボタンで本人だけが表示できる） */
+    var sDate = function (t) {
+      if (!t) return "&minus;";
+      var dd2 = new Date(t);
+      return (dd2.getMonth() + 1) + "/" + dd2.getDate();
+    };
+    var tipsArr = Array.isArray(sales.tips) ? sales.tips : [];
+    var buyersArr = Array.isArray(sales.buyers) ? sales.buyers : [];
+    var peopleHtml = "";
+    if (tipsArr.length || buyersArr.length) {
+      var tipTbl = "";
+      if (tipsArr.length) {
+        var tipRows = tipsArr.map(function (t2) {
+          var msg = t2.msg
+            ? '<span class="nm-m">💬 メッセージあり</span><span class="nm-r">' + esc(t2.msg) + "</span>"
+            : '<span class="nm-m">&minus;</span><span class="nm-r">&minus;</span>';
+          var th2 = t2.thanked == null ? "&minus;" : (t2.thanked ? "✅ 済" : "🕊 まだ");
+          return "<tr><td class='n'>" + sDate(t2.at) + "</td>" +
+            "<td class='ttl'>" + nmCell(t2.name, t2.urlname, t2.guest) + "</td>" +
+            "<td class='n'>" + yen(t2.price) + "</td>" +
+            "<td>" + (t2.item ? esc(t2.item) : "&minus;") + "</td>" +
+            "<td>" + msg + "</td>" +
+            "<td class='n'>" + th2 + "</td></tr>";
+        }).join("");
+        tipTbl = '<h3 style="margin:14px 2px 8px;font-size:14.5px">💝 チップをくれた人（' + num(sales.tipCount || tipsArr.length) + " 件）</h3>" +
+          '<div class="tblwrap"><table style="min-width:620px"><tr><th class="n">日付</th><th>くれた人</th><th class="n">金額</th><th>チップの対象</th><th>メッセージ</th><th class="n">お礼</th></tr>' +
+          tipRows + "</table></div>" +
+          ((sales.tipTotal || 0) > tipsArr.length ? '<p class="note">※ 多いので新しい ' + num(tipsArr.length) + " 件だけ出しています（全 " + num(sales.tipTotal) + " 件）。</p>" : "");
+      }
+      var buyTbl = "";
+      if (buyersArr.length) {
+        var buyRows = buyersArr.map(function (b2) {
+          return "<tr><td class='ttl'>" + nmCell(b2.name, b2.urlname, b2.guest) + "</td>" +
+            "<td class='n'>" + num(b2.count) + "</td>" +
+            "<td class='n'>" + yen(b2.amount) + "</td>" +
+            "<td class='n'>" + sDate(b2.last) + "</td></tr>";
+        }).join("");
+        buyTbl = '<h3 style="margin:18px 2px 8px;font-size:14.5px">🛒 買ってくれた人（' + num(sales.buyerTotal || buyersArr.length) + " 人）</h3>" +
+          '<div class="tblwrap"><table style="min-width:420px"><tr><th>買ってくれた人</th><th class="n">購入</th><th class="n">合計</th><th class="n">最後の購入</th></tr>' +
+          buyRows + "</table></div>" +
+          ((sales.buyerTotal || 0) > buyersArr.length ? '<p class="note">※ 多いので上位 ' + num(buyersArr.length) + " 人だけ出しています（全 " + num(sales.buyerTotal) + " 人）。</p>" : "");
+      }
+      peopleHtml = '<div class="reveal" style="margin-top:18px">' +
+        '<input type="checkbox" id="rv-nm" class="rv-chk">' +
+        '<label class="rv-btn" for="rv-nm"><span class="rv-on">👀 お名前とメッセージを表示する</span><span class="rv-off">🙈 お名前をかくす</span></label>' +
+        '<span class="note" style="display:inline-block;margin-left:6px">ほかの人の名前なので、最初はかくしてあります</span>' +
+        '<div class="rv-body">' + tipTbl + buyTbl + "</div></div>";
+    }
     salesHtml = '<div class="kpis">' + sKpiHtml + "</div>" +
       '<div class="card" style="margin-top:14px"><h3 style="margin:0 0 10px;font-size:14.5px">📆 月別の売上（直近12か月）</h3>' + barChart(monItems, "f-sun") + "</div>" +
       dailySalesHtml +
       '<div class="tblwrap" style="margin-top:14px"><table style="min-width:520px"><tr><th>有料note・商品</th><th class="n">価格</th><th class="n">販売数</th><th class="n">売上</th></tr>' + salesRows + "</table></div>" +
+      peopleHtml +
       '<p class="note">金額は販売価格ベース（プラットフォーム利用料などが引かれる前）で、返金分は除いています。日別グラフは購入された日（円）で集計しています。正確な振込額はnoteの「売上管理」画面で確認してね。定期購読マガジン・メンバーシップの売上はここには含まれません。</p>' +
-      frogTip("売上はあなただけの大事なデータ。レポートを誰かに見せたりスクショするときは、この欄が写っていないか確認してね🐸");
+      frogTip("売上とお名前は、あなただけの大事なデータ。ほかの人の名前は最初かくしてあるけど、表示したままスクショ・共有・AIに渡すのはやめてね🐸");
   }
 
   var secNo = 0;
@@ -1187,6 +1260,16 @@ window.__noteBuildHtml = function (d) {
     "tr.top3 td{background:#FFF0CE}" +
     ".tg-bar{width:40%;min-width:160px}" +
     ".note{font-size:12px;color:var(--sub);margin:8px 2px}" +
+    ".rv-chk{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}" +
+    ".rv-btn{display:inline-block;cursor:pointer;background:var(--sun-l);color:#8A6A00;border:1px solid #F0DFA8;border-radius:999px;padding:5px 14px;font-size:12.5px;font-weight:700;-webkit-user-select:none;user-select:none}" +
+    ".rv-chk:focus ~ .rv-btn{outline:2px solid var(--grn-d);outline-offset:2px}" +
+    ".rv-off{display:none}" +
+    ".rv-chk:checked ~ .rv-btn .rv-on{display:none}" +
+    ".rv-chk:checked ~ .rv-btn .rv-off{display:inline}" +
+    ".nm-m{color:var(--sub);letter-spacing:.5px}" +
+    ".nm-r{display:none}" +
+    ".rv-chk:checked ~ .rv-body .nm-m{display:none}" +
+    ".rv-chk:checked ~ .rv-body .nm-r{display:inline}" +
     ".empty{color:var(--sub);font-size:13.5px;padding:10px;margin:0}" +
     "footer{margin-top:48px;text-align:center;color:var(--sub);font-size:12px}" +
     "footer .foot-frog{font-size:14px;color:#2C5C45;background:var(--grn-l);display:inline-block;border-radius:999px;padding:6px 18px;margin-bottom:10px}" +
@@ -1698,7 +1781,10 @@ window.noteAnalyze = async function (opts) {
         if (proceed) {
           UI.status('売上を確認しています…', '有料noteの販売データ', null);
           const monthly = [], byArt = {}, daily = {};
-          let totalCnt = 0, totalAmt = 0, dailyOk = false;
+          // tips = チップ（応援）1件ずつの明細、buyers = 購入者ごとのまとめ。
+          // どちらもレポートでは初期表示が伏せ字（本人がボタンを押したときだけ名前が見える）。
+          const tips = [], buyers = {};
+          let totalCnt = 0, totalAmt = 0, dailyOk = false, tipCnt = 0, tipAmt = 0;
           for (let mi = 11; mi >= 0; mi--) {  // 今月をふくむ直近12か月
             const md = new Date(nowD.getFullYear(), nowD.getMonth() - mi, 1);
             let mp = 1, mCnt = 0, mAmt = 0;
@@ -1707,14 +1793,19 @@ window.noteAnalyze = async function (opts) {
               const r2 = readItems(j);
               if (!r2.items.length) break;
               r2.items.forEach((pc) => {
-                if (pc.is_refund) return; // 返金分は数えない
+                if (pc.is_refund || pc.isRefund) return; // 返金分は数えない
                 const price = Number(pc.price) || 0;
-                const k = (pc.content && pc.content.key) || pc.purchase_content_key || '';
+                const cont = pc.content || {};
+                // content.type が 'user' の明細は「チップ（応援）」。記事・マガジンとは別に数える。
+                // チップは content.key が記事のキーではないので、商品テーブルに混ぜると中身が狂う。
+                const isTip = (cont.type || '') === 'user';
+                const k = cont.key || pc.purchase_content_key || '';
                 mCnt++; mAmt += price; totalCnt++; totalAmt += price;
-                if (k) {
+                if (isTip) { tipCnt++; tipAmt += price; }
+                else if (k) {
                   const ent = byArt[k] = byArt[k] || { count: 0, amount: 0, name: null };
                   ent.count++; ent.amount += price;
-                  if (!ent.name && pc.content && pc.content.name) ent.name = pc.content.name;
+                  if (!ent.name && cont.name) ent.name = cont.name;
                 }
                 // 日別集計: 明細の購入日時から「日ごとの売上」を作る（追加リクエストなし）。
                 // 日付のフィールド名も非公開APIのため防御的に複数名へ対応。読めない明細は月別のみに数える。
@@ -1724,13 +1815,52 @@ window.noteAnalyze = async function (opts) {
                   const de = daily[dk] = daily[dk] || { count: 0, amount: 0 };
                   de.count++; de.amount += price; dailyOk = true;
                 }
+                // 買ってくれた人・チップをくれた人（非公開APIなのでフィールド名は防御的に読む）。
+                // ゲスト購入は名前が無いので、まとめて1行に合算する。
+                const pu = pc.user || {};
+                const guest = !!(pu.is_guest || pu.isGuest);
+                const nick = guest ? '' : String(pu.nickname || pu.urlname || '');
+                const urln = guest ? '' : String(pu.urlname || '');
+                const uid = guest ? '' : String(pu.id || pu.number_type_id || pu.numberTypeId || '');
+                const at = pdt ? pdt.getTime() : null;
+                if (isTip) {
+                  if (tips.length < 500) {
+                    // チップに添えられたメッセージ（via:'support'）。自分が送ったお礼（via:'thankyou'）とは別。
+                    const msgs = Array.isArray(pc.messages) ? pc.messages : [];
+                    let body = '';
+                    for (let mq = msgs.length - 1; mq >= 0; mq--) {
+                      const mm = msgs[mq] || {};
+                      if (mm.via === 'support' && mm.body) { body = String(mm.body); break; }
+                    }
+                    const via = (cont.support_via_content || cont.supportViaContent || {});
+                    const thanked = pc.already_sent_thankyou != null ? !!pc.already_sent_thankyou
+                      : (pc.alreadySentThankyou != null ? !!pc.alreadySentThankyou : null);
+                    tips.push({ name: nick, urlname: urln, guest, price, at, item: String(via.name || ''), msg: body, thanked });
+                  }
+                } else {
+                  const bk = guest ? '@guest' : (urln ? 'u:' + urln : (uid ? '#' + uid : (nick ? '~' + nick : '@unknown')));
+                  const be = buyers[bk] = buyers[bk] || { name: nick, urlname: urln, guest, count: 0, amount: 0, last: null };
+                  be.count++; be.amount += price;
+                  if (!be.name && nick) be.name = nick;
+                  if (!be.urlname && urln) be.urlname = urln;
+                  if (at && (!be.last || at > be.last)) be.last = at;
+                }
               });
               if (r2.dd.last_page || r2.dd.isLastPage || mp > 40) break;
               mp++;
             }
             monthly.push({ ym: md.getFullYear() + '/' + (md.getMonth() + 1), count: mCnt, amount: mAmt });
           }
-          if (hasPaid || totalCnt > 0) sales = { monthly, byArt, daily: dailyOk ? daily : null, count: totalCnt, amount: totalAmt, hasPaid };
+          // 表示用に並べ替え: チップは新しい順、購入者は「たくさん買ってくれた順」。多すぎるときは上位だけ。
+          const tipList = tips.sort((x, y) => (y.at || 0) - (x.at || 0)).slice(0, 100);
+          const buyerList = Object.keys(buyers).map((bk) => buyers[bk])
+            .sort((x, y) => (y.count - x.count) || (y.amount - x.amount) || ((y.last || 0) - (x.last || 0)));
+          if (hasPaid || totalCnt > 0) sales = {
+            monthly, byArt, daily: dailyOk ? daily : null, count: totalCnt, amount: totalAmt, hasPaid,
+            tipCount: tipCnt, tipAmount: tipAmt,
+            tips: tipList, tipTotal: tips.length,
+            buyers: buyerList.slice(0, 100), buyerTotal: buyerList.length,
+          };
         }
         // パスワード再確認が必要なせいで読めなかった場合は、その案内だけを出す
         if (!sales && needVerify) sales = { needVerify: true };

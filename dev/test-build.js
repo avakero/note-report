@@ -145,5 +145,47 @@ if (html6.includes('有料noteの売上')) throw new Error('case6: lite should h
 if (html1.includes('有料noteの売上')) throw new Error('case6: sales section should be hidden without sales data');
 console.log('case6 (売上の出し分け) OK');
 
+// --- ケース7: チップ・購入者リスト（初期表示は伏せ字・切り替えはCSSだけ） ---
+if (html5.includes('チップをくれた人')) throw new Error('case7: people list must not appear without tips/buyers');
+const sales7 = {
+  ...sales5,
+  tipCount: 2, tipAmount: 600,
+  tips: [
+    { name: 'あばけろ君', urlname: 'abakero', guest: false, price: 500, at: today5.getTime(), item: '記事その1', msg: 'いつも読んでます！', thanked: false },
+    { name: '', urlname: '', guest: true, price: 100, at: yest5.getTime(), item: '', msg: '', thanked: true },
+  ],
+  tipTotal: 2,
+  buyers: [
+    { name: 'まきまき', urlname: 'makiy3111', guest: false, count: 2, amount: 1000, last: today5.getTime() },
+    { name: '', urlname: '', guest: true, count: 1, amount: 800, last: yest5.getTime() },
+  ],
+  buyerTotal: 2,
+};
+let html7 = window.__noteBuildHtml({ ...base, arts: artsPaid, prevSnap: null, snapSaved: true, sales: sales7 });
+for (const needle of [
+  'チップをくれた人',
+  '買ってくれた人',
+  'あ***',                              // 伏せ字（初期表示）
+  'ま***',
+  '💬 メッセージあり',                   // メッセージ本文もボタンを押すまで出さない
+  'class="rv-chk"',                     // CSSトグル本体
+  'お名前とメッセージを表示する',
+  'href="https://note.com/abakero"',    // 表示したときのプロフィールリンク
+  'いつも読んでます！',                  // 本文はHTMLに入っているがCSSで隠れている
+  '💝 チップ（応援）',                    // 商品テーブルのチップ行
+  '🕊 まだ',                             // お礼がまだの印
+  'ゲスト',                              // ゲスト購入
+]) {
+  if (!html7.includes(needle)) throw new Error('case7 missing: ' + needle);
+}
+// 初期状態は本名が隠れている＋チェックで表示に切り替わる（CSSだけで完結）
+for (const css of ['.nm-r{display:none}', '.rv-chk:checked ~ .rv-body .nm-m{display:none}', '.rv-chk:checked ~ .rv-body .nm-r{display:inline}']) {
+  if (!html7.includes(css)) throw new Error('case7 css missing: ' + css);
+}
+// 名前まわりにインラインJSを足していない（スマホのiframe表示ではnoteのCSPで動かないため）
+const people7 = html7.split('チップをくれた人')[1].split('金額は販売価格ベース')[0];
+if (/onclick|<script/i.test(people7)) throw new Error('case7: no inline JS allowed in the people list');
+console.log('case7 (チップ・購入者リスト: 伏せ字トグル) OK');
+
 fs.writeFileSync(require('path').join(__dirname, 'report-case2.html'), html2);
 console.log('ALL OK');

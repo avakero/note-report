@@ -197,10 +197,14 @@ let captured = null;
         // オフセットなし＝ローカル時刻として解釈されるので、テスト実行環境のTZに関係なく「今日」に入る
         const iso9 = (d) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0') + 'T12:00:00';
         return { ok: true, status: 200, json: async () => ({ data: { last_page: true, purchasers: [
-          { price: 500, created_at: iso9(now9), content: { key: 'a1', name: '記事その1' } },
-          { price: 500, created_at: iso9(now9), content: { key: 'a1', name: '記事その1' } },
-          { price: 300, is_refund: true, created_at: iso9(now9), content: { key: 'a1', name: '記事その1' } }, // 返金 → 除外
-          { price: 800, purchase_content_key: 'm1' }, // 記事一覧にない商品（マガジン等）・日付なしでも壊れない
+          { price: 500, created_at: iso9(now9), user: { id: 11, nickname: 'ふぁん1', urlname: 'fan1' }, content: { type: 'note', key: 'a1', name: '記事その1' } },
+          { price: 500, created_at: iso9(now9), user: { id: 11, nickname: 'ふぁん1', urlname: 'fan1' }, content: { type: 'note', key: 'a1', name: '記事その1' } },
+          { price: 300, is_refund: true, created_at: iso9(now9), user: { id: 33, nickname: 'ふぁん2', urlname: 'fan2' }, content: { type: 'note', key: 'a1', name: '記事その1' } }, // 返金 → 除外
+          { price: 800, user: { is_guest: true }, purchase_content_key: 'm1' }, // 記事一覧にない商品（マガジン等）・日付なし・ゲスト購入でも壊れない
+          // チップ（応援）は content.type === 'user'。メッセージ付き・お礼はまだ
+          { price: 200, created_at: iso9(now9), user: { id: 22, nickname: 'おうえん', urlname: 'ouen' },
+            content: { type: 'user', key: 'testuser', support_via_content: { key: 'a1', name: '記事その1' } },
+            messages: [{ via: 'support', body: 'いつもありがとう' }], already_sent_thankyou: false },
         ] } }) };
       }
       return { ok: true, status: 200, json: async () => ({ data: { last_page: true, purchasers: [] } }) };
@@ -212,23 +216,43 @@ let captured = null;
   await window.noteAnalyze({ download: false, delay: 0 });
   const s9 = captured.sales;
   if (!s9) throw new Error('run9: sales missing');
-  if (s9.count !== 3 || s9.amount !== 1800) throw new Error('run9: bad totals ' + JSON.stringify({ count: s9.count, amount: s9.amount }));
+  if (s9.count !== 4 || s9.amount !== 2000) throw new Error('run9: bad totals ' + JSON.stringify({ count: s9.count, amount: s9.amount }));
   if (!s9.byArt.a1 || s9.byArt.a1.count !== 2 || s9.byArt.a1.amount !== 1000) throw new Error('run9: bad byArt.a1 ' + JSON.stringify(s9.byArt.a1));
   if (!s9.byArt.m1 || s9.byArt.m1.count !== 1 || s9.byArt.m1.amount !== 800) throw new Error('run9: bad byArt.m1 ' + JSON.stringify(s9.byArt.m1));
+  // チップは商品テーブルに混ぜず、別集計にする
+  if (s9.byArt.testuser) throw new Error('run9: tip must not go into byArt');
+  if (s9.tipCount !== 1 || s9.tipAmount !== 200) throw new Error('run9: bad tip totals ' + JSON.stringify({ c: s9.tipCount, a: s9.tipAmount }));
+  if (!s9.tips || s9.tips.length !== 1) throw new Error('run9: tips missing');
+  const tip9 = s9.tips[0];
+  if (tip9.name !== 'おうえん' || tip9.urlname !== 'ouen' || tip9.price !== 200) throw new Error('run9: bad tip ' + JSON.stringify(tip9));
+  if (tip9.item !== '記事その1' || tip9.msg !== 'いつもありがとう' || tip9.thanked !== false) throw new Error('run9: bad tip detail ' + JSON.stringify(tip9));
+  // 買ってくれた人は人ごとにまとめる（返金は除外・ゲストは1行に合算・チップは入れない）
+  if (!s9.buyers || s9.buyers.length !== 2) throw new Error('run9: bad buyers ' + JSON.stringify(s9.buyers));
+  const fan9 = s9.buyers.find((b) => b.urlname === 'fan1');
+  if (!fan9 || fan9.count !== 2 || fan9.amount !== 1000 || fan9.name !== 'ふぁん1') throw new Error('run9: bad buyer fan1 ' + JSON.stringify(fan9));
+  if (s9.buyers.some((b) => b.urlname === 'fan2')) throw new Error('run9: refunded buyer must be excluded');
+  if (s9.buyers.some((b) => b.urlname === 'ouen')) throw new Error('run9: tip must not be counted as a buyer');
+  const guest9 = s9.buyers.find((b) => b.guest);
+  if (!guest9 || guest9.count !== 1 || guest9.amount !== 800 || guest9.name !== '') throw new Error('run9: bad guest buyer ' + JSON.stringify(guest9));
   if (s9.monthly.length !== 12) throw new Error('run9: expected 12 months, got ' + s9.monthly.length);
-  if (s9.monthly[11].amount !== 1800 || s9.monthly[10].amount !== 0) throw new Error('run9: bad monthly ' + JSON.stringify(s9.monthly.slice(-2)));
+  if (s9.monthly[11].amount !== 2000 || s9.monthly[10].amount !== 0) throw new Error('run9: bad monthly ' + JSON.stringify(s9.monthly.slice(-2)));
   // 日別集計: 返金と日付なしの明細は入らない（日付なしは月別のみ）
   const dk9 = now9.getFullYear() + '-' + String(now9.getMonth() + 1).padStart(2, '0') + '-' + String(now9.getDate()).padStart(2, '0');
   if (!s9.daily || !s9.daily[dk9]) throw new Error('run9: daily missing: ' + JSON.stringify(s9.daily));
-  if (s9.daily[dk9].count !== 2 || s9.daily[dk9].amount !== 1000) throw new Error('run9: bad daily ' + JSON.stringify(s9.daily[dk9]));
+  if (s9.daily[dk9].count !== 3 || s9.daily[dk9].amount !== 1200) throw new Error('run9: bad daily ' + JSON.stringify(s9.daily[dk9]));
   if (Object.keys(s9.daily).length !== 1) throw new Error('run9: unexpected daily keys ' + JSON.stringify(Object.keys(s9.daily)));
   const html9 = realBuild(captured);
-  for (const needle of ['有料noteの売上', '直近12か月の売上', '&yen;1,800', '（マガジン・その他の商品）', '日別の売上（最近30日）', 'bar-val">1,000</span>']) {
+  for (const needle of ['有料noteの売上', '直近12か月の売上', '&yen;2,000', '（マガジン・その他の商品）',
+    'チップをくれた人', '買ってくれた人', 'お***', 'ふ***', '💬 メッセージあり', '日別の売上（最近30日）', 'bar-val">1,200</span>']) {
     if (!html9.includes(needle)) throw new Error('run9 html missing: ' + needle);
   }
   // AI相談プロンプト（__noteAISection）にも売上1行が入る
   const ai9 = window.__noteAISection(captured);
-  if (!ai9.includes('有料noteの売上(直近12か月・返金除く): 1800円（販売3件）')) throw new Error('run9: AI prompt sales line missing');
+  if (!ai9.includes('有料noteの売上(直近12か月・返金除く): 2000円（販売4件）')) throw new Error('run9: AI prompt sales line missing');
+  // AIに渡すプロンプトに買い手の名前は入れない（他人の個人情報なので）
+  for (const leak of ['おうえん', 'ouen', 'ふぁん1', 'fan1']) {
+    if (ai9.includes(leak)) throw new Error('run9: AI prompt must not contain buyer info: ' + leak);
+  }
   console.log('run9 (機能追加版・売上セクション: 集計・返金除外・マガジン) OK');
 
   // --- 実行10回目: 通常版（チャンネル・PLUSなし）では有料記事＋売上があっても売上機能は出ない ---

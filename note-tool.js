@@ -741,11 +741,13 @@ window.__noteBuildHtml = function (d) {
   /* ---------- 部品レンダラー ---------- */
 
   /* 横棒グラフ */
-  function barChart(items, colorVar) {
+  /* split = true で横2列に折り返す（30本・60本のグラフが縦に伸びすぎるのを防ぐ）。
+     幅の狭いカードの中では読みにくくなるので、広い場所に置くグラフだけ true にすること。 */
+  function barChart(items, colorVar, split) {
     var mx = 0;
     items.forEach(function (it) { if (it.v > mx) mx = it.v; });
     if (!items.length || mx === 0) return '<p class="empty">データはまだないみたい。これからが楽しみ！🌱</p>';
-    return '<div class="bars">' + items.map(function (it) {
+    return '<div class="bars' + (split ? " split" : "") + '">' + items.map(function (it) {
       var w = Math.max(1.5, it.v / mx * 100);
       return '<div class="bar-row">' +
         '<span class="bar-label">' + esc(it.label) + '</span>' +
@@ -1008,11 +1010,11 @@ window.__noteBuildHtml = function (d) {
         if (s0.fol != null && s1.fol != null) folItems.push({ label: lbl, v: Math.max(0, Number(s1.fol) - Number(s0.fol)) });
       }
       var histCols = "";
-      if (hasPV && pvItems.length) histCols += '<div class="card"><h3 style="margin:0 0 10px;font-size:14.5px">👀 1日ごとのPVの伸び</h3>' + barChart(pvItems, "f-green") + "</div>";
-      if (likeItems.length) histCols += '<div class="card"><h3 style="margin:0 0 10px;font-size:14.5px">💛 1日ごとのスキの伸び</h3>' + barChart(likeItems, "f-sun") + "</div>";
-      if (cmtItems.length) histCols += '<div class="card"><h3 style="margin:0 0 10px;font-size:14.5px">💬 1日ごとのコメントの伸び</h3>' + barChart(cmtItems, "f-sky") + "</div>";
-      if (folItems.length) histCols += '<div class="card"><h3 style="margin:0 0 10px;font-size:14.5px">🌱 1日ごとのフォロワーの伸び</h3>' + barChart(folItems, "f-coral") + "</div>";
-      if (histCols) histHtml = '<div class="twocol" style="margin-top:14px">' + histCols + "</div>" +
+      if (hasPV && pvItems.length) histCols += '<div class="card"><h3 style="margin:0 0 10px;font-size:14.5px">👀 1日ごとのPVの伸び</h3>' + barChart(pvItems, "f-green", true) + "</div>";
+      if (likeItems.length) histCols += '<div class="card"><h3 style="margin:0 0 10px;font-size:14.5px">💛 1日ごとのスキの伸び</h3>' + barChart(likeItems, "f-sun", true) + "</div>";
+      if (cmtItems.length) histCols += '<div class="card"><h3 style="margin:0 0 10px;font-size:14.5px">💬 1日ごとのコメントの伸び</h3>' + barChart(cmtItems, "f-sky", true) + "</div>";
+      if (folItems.length) histCols += '<div class="card"><h3 style="margin:0 0 10px;font-size:14.5px">🌱 1日ごとのフォロワーの伸び</h3>' + barChart(folItems, "f-coral", true) + "</div>";
+      if (histCols) histHtml = '<div class="histgrid" style="margin-top:14px">' + histCols + "</div>" +
         '<p class="note">レポートを作った日ごとの「前回からの増え方」。作らなかった日のぶんは、次に作った日の棒にまとめて入ります。記録は最大400日ぶん残り、グラフには直近60日ぶんを表示。減った日（フォロワー解除など）は0として表示されます。</p>';
     }
 
@@ -1075,7 +1077,7 @@ window.__noteBuildHtml = function (d) {
         var sde = dailyMap[sdk];
         sdItems.push({ label: (sdd.getMonth() + 1) + "/" + sdd.getDate(), v: sde ? Number(sde.amount) || 0 : 0 });
       }
-      dailySalesHtml = '<div class="card" style="margin-top:14px"><h3 style="margin:0 0 10px;font-size:14.5px">📅 日別の売上（最近30日）</h3>' + barChart(sdItems, "f-green") + "</div>";
+      dailySalesHtml = '<div class="card"><h3 style="margin:0 0 10px;font-size:14.5px">📅 日別の売上（最近30日）</h3>' + barChart(sdItems, "f-green") + "</div>";
     }
     /* 商品テーブル: 有料記事＋（記事一覧に無い）購入された商品をまとめる */
     var byArt = sales.byArt || {};
@@ -1154,8 +1156,8 @@ window.__noteBuildHtml = function (d) {
         '<div class="rv-body">' + tipTbl + buyTbl + "</div></div>";
     }
     salesHtml = '<div class="kpis">' + sKpiHtml + "</div>" +
-      '<div class="card" style="margin-top:14px"><h3 style="margin:0 0 10px;font-size:14.5px">📆 月別の売上（直近12か月）</h3>' + barChart(monItems, "f-sun") + "</div>" +
-      dailySalesHtml +
+      '<div class="twocol" style="margin-top:14px"><div class="card"><h3 style="margin:0 0 10px;font-size:14.5px">📆 月別の売上（直近12か月）</h3>' + barChart(monItems, "f-sun") + "</div>" +
+      dailySalesHtml + "</div>" +
       '<div class="tblwrap" style="margin-top:14px"><table style="min-width:520px"><tr><th>有料note・商品</th><th class="n">価格</th><th class="n">販売数</th><th class="n">売上</th></tr>' + salesRows + "</table></div>" +
       peopleHtml +
       '<p class="note">金額は販売価格ベース（プラットフォーム利用料などが引かれる前）で、返金分は除いています。日別グラフは購入された日（円）で集計しています。正確な振込額はnoteの「売上管理」画面で確認してね。定期購読マガジン・メンバーシップの売上はここには含まれません。</p>' +
@@ -1188,7 +1190,7 @@ window.__noteBuildHtml = function (d) {
     ".frog-tip{display:flex;align-items:flex-start;gap:10px;margin:16px 2px 0}" +
     ".frog-face{font-size:26px;line-height:1.2}" +
     ".frog-bubble{background:var(--grn-l);border:1.5px solid #BFE8D2;border-radius:16px 16px 16px 4px;padding:8px 14px;font-size:13px;color:#2C5C45}" +
-    ".acts{display:flex;flex-direction:column;gap:12px}" +
+    ".acts{display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:12px;align-items:start}" +
     ".act{display:flex;gap:14px;background:var(--card);border:1px solid var(--line);border-radius:18px;padding:15px 17px 15px 22px;box-shadow:0 3px 10px rgba(120,100,40,.07);position:relative;overflow:hidden}" +
     ".act:before{content:'';position:absolute;left:0;top:0;bottom:0;width:6px}" +
     ".act:nth-child(4n+1):before{background:linear-gradient(180deg,#2FB984,#17A366)}" +
@@ -1211,9 +1213,13 @@ window.__noteBuildHtml = function (d) {
     ".kpi-v{font-size:26px;font-weight:700;color:var(--grn-d);line-height:1.3}" +
     ".kpi-v small{font-size:14px;font-weight:600;margin-left:2px}" +
     ".kpi-sub{font-size:11.5px;color:var(--sub);margin-top:2px}" +
-    ".twocol{display:flex;gap:16px;flex-wrap:wrap}" +
+    ".twocol{display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start}" +
+    /* 「1日ごとの伸び」用: 必ず2列以内にして、中のバーを2列に折り返しても細くなりすぎないようにする */
+    ".histgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(430px,1fr));gap:16px;align-items:start}" +
     ".twocol>.card{flex:1 1 320px;min-width:280px}" +
     ".bars{display:flex;flex-direction:column;gap:4px}" +
+    ".bars.split{display:block;column-count:2;column-gap:22px}" +
+    ".bars.split .bar-row{break-inside:avoid;margin-bottom:4px}" +
     ".bar-row{display:flex;align-items:center;gap:8px;font-size:12.5px}" +
     ".bar-label{flex:0 0 44px;text-align:right;color:var(--sub)}" +
     ".bar-track{flex:1;background:#F4EEDD;border-radius:999px;height:14px;overflow:hidden;display:inline-block}" +
@@ -1273,6 +1279,7 @@ window.__noteBuildHtml = function (d) {
     ".empty{color:var(--sub);font-size:13.5px;padding:10px;margin:0}" +
     "footer{margin-top:48px;text-align:center;color:var(--sub);font-size:12px}" +
     "footer .foot-frog{font-size:14px;color:#2C5C45;background:var(--grn-l);display:inline-block;border-radius:999px;padding:6px 18px;margin-bottom:10px}" +
+    "@media (max-width:860px){.bars.split{column-count:1}}" +
     "@media (max-width:640px){body{font-size:14px}.wrap{padding:16px 10px 48px}header.hd{padding:20px 16px}header.hd .hd-frog{font-size:36px;right:12px;top:12px}.kpi{flex:1 1 44%;min-width:120px}.kpi-v{font-size:22px}h2{font-size:16.5px}}" +
     "@media print{body{background:#fff}.card,.act,.kpi,.tblwrap{box-shadow:none;break-inside:avoid}header.hd{-webkit-print-color-adjust:exact;print-color-adjust:exact}*{-webkit-print-color-adjust:exact;print-color-adjust:exact}h2{break-after:avoid}" +
     ".tblwrap{overflow-x:visible}table{min-width:0!important;width:100%;font-size:11px}th,td{padding:5px 6px}th{white-space:normal}tr{break-inside:avoid}td{overflow-wrap:break-word}td.ttl,td.tags{min-width:0}.tag{font-size:10px;padding:1px 6px}" +
@@ -1313,7 +1320,7 @@ window.__noteBuildHtml = function (d) {
     /* ④b 日別スキ推移（コラボ基本版では非表示） */
     (d.liteMode ? "" :
       secTitle("📆 日別スキの推移（最近30日）", "スキが付いた日ごとの件数（スキの時刻から集計）。投稿した日の翌日に山ができていたら、それが「翌日に伸びた」サインだよ。") +
-      '<div class="card">' + barChart(dayItems, "f-green") + "</div>") +
+      '<div class="card">' + barChart(dayItems, "f-green", true) + "</div>") +
 
     /* ⑤ ヒートマップ（全体） */
     secTitle("🔥 曜日 × 時間帯ヒートマップ（スキ全体）", "オレンジが濃いマスほどスキが集中！横スクロールで24時間ぶん見られるよ。") +

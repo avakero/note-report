@@ -592,6 +592,9 @@ window.__noteBuildHtml = function (d) {
     return {
       key: a.key, title: a.title || "(無題)", dt: dt,
       read: read, like: like, cmt: cmt, rate: rate,
+      // インプレッションと旧「ビュー」も持ち回る（noteの新ダッシュボードから取れたときだけ入る）
+      imp: (a.imp == null || isNaN(Number(a.imp))) ? null : Number(a.imp),
+      readOld: (a.readOld == null || isNaN(Number(a.readOld))) ? null : Number(a.readOld),
       price: Number(a.price) || 0,
       tags: Array.isArray(a.tags) ? a.tags : []
     };
@@ -600,7 +603,12 @@ window.__noteBuildHtml = function (d) {
   var totLike = Number(d.totLike) || 0;
   var totCmt = Number(d.totCmt) || 0;
   var totPV = (d.totPV == null || isNaN(Number(d.totPV))) ? null : Number(d.totPV);
-  var overallRate = (hasPV && totPV != null && totPV > 0) ? (totLike / totPV * 100) : null;
+  /* 全体スキ率の分母。noteの新ダッシュボードの数字が取れているときは、そちらに合わせる
+     （KPIの「読まれた回数」と分母をそろえて、noteの画面と同じ計算になるようにする）。 */
+  var insTop = d.insight || null;
+  var overallRate = (insTop && insTop.pv > 0 && insTop.like != null)
+    ? (Number(insTop.like) / Number(insTop.pv) * 100)
+    : ((hasPV && totPV != null && totPV > 0) ? (totLike / totPV * 100) : null);
   var fans = Array.isArray(d.fans) ? d.fans : [];
   var prospects = Array.isArray(d.prospects) ? d.prospects : [];
   var uniqLikers = fans.length;
@@ -647,6 +655,19 @@ window.__noteBuildHtml = function (d) {
   }
 
   /* ---------- 🎯 次の一手（アクション導出） ---------- */
+  /* noteの新ダッシュボード（GraphQL）から取れた数字。取れなかったときは null で、
+     その場合はインプレッション系の表示をまるごと省く（従来の見た目に戻る）。 */
+  var ins = d.insight || null;
+  /* ひらかれ率 = 表示された回数のうち、実際に開かれた割合。サムネとタイトルの通信簿。 */
+  function openRate(imp, pv) {
+    var i = Number(imp), p = Number(pv);
+    return (!i || isNaN(i) || isNaN(p)) ? null : (p / i) * 100;
+  }
+  var insArts = ins ? arts.filter(function (a) { return a.imp != null && a.imp > 0; }) : [];
+  var avgOpen = insArts.length ? openRate(
+    insArts.reduce(function (t, a) { return t + Number(a.imp || 0); }, 0),
+    insArts.reduce(function (t, a) { return t + Number(a.read || 0); }, 0)) : null;
+
   var actions = [];
 
   /* (1) 投稿ベスト時間帯 */
@@ -709,6 +730,23 @@ window.__noteBuildHtml = function (d) {
     }
   }
 
+  /* (4b) 惜しい記事: スキ率は平均以上なのに「ひらかれ率」が低い＝サムネ・タイトルで損している */
+  if (insArts.length >= 3 && avgOpen != null && overallRate != null) {
+    var missed = insArts.filter(function (a) {
+      var o = openRate(a.imp, a.read);
+      return o != null && o < avgOpen * 0.8 && a.rate != null && a.rate >= overallRate && (a.imp || 0) >= 100;
+    }).sort(function (a, b) { return (b.imp || 0) - (a.imp || 0); }).slice(0, 2);
+    if (missed.length) {
+      var body4b = missed.map(function (a) {
+        return "「<b>" + esc(a.title) + "</b>」は " + num(a.imp) + " 回も表示されたのに、ひらかれ率 <b>" +
+          pct(openRate(a.imp, a.read)) + "</b>（平均 " + pct(avgOpen) + "）。でも読んだ人のスキ率は " +
+          pct(a.rate) + " と平均以上";
+      }).join("。");
+      body4b += "。<b>中身は刺さっているのに、見出し画像とタイトルで損をしています。</b>ここを変えるのがいちばん費用対効果の高いリライトです。";
+      actions.push({ icon: "🔥", title: "惜しい記事 — サムネとタイトルだけ直そう", body: body4b });
+    }
+  }
+
   /* (5) 声かけ優先リスト（見込みフォロワー上位） */
   if (prospects.length) {
     var pTop4 = prospects.slice(0, 4);
@@ -743,11 +781,11 @@ window.__noteBuildHtml = function (d) {
   /* 横棒グラフ */
   /* split = true で横2列に折り返す（30本・60本のグラフが縦に伸びすぎるのを防ぐ）。
      幅の狭いカードの中では読みにくくなるので、広い場所に置くグラフだけ true にすること。 */
-  function barChart(items, colorVar, split) {
+  function barChart(items, colorVar, split, wideLabel) {
     var mx = 0;
     items.forEach(function (it) { if (it.v > mx) mx = it.v; });
     if (!items.length || mx === 0) return '<p class="empty">データはまだないみたい。これからが楽しみ！🌱</p>';
-    return '<div class="bars' + (split ? " split" : "") + '">' + items.map(function (it) {
+    return '<div class="bars' + (split ? " split" : "") + (wideLabel ? " wide" : "") + '">' + items.map(function (it) {
       var w = Math.max(1.5, it.v / mx * 100);
       return '<div class="bar-row">' +
         '<span class="bar-label">' + esc(it.label) + '</span>' +
@@ -853,12 +891,38 @@ window.__noteBuildHtml = function (d) {
   /* ③ KPI */
   var kpis = [];
   kpis.push({ label: "がんばって書いた記事", v: num(nArt), sub: "コツコツの積み重ね！" });
-  if (hasPV) kpis.push({ label: "読まれた回数（総PV）", v: num(totPV), sub: "集計時点: " + esc(meta.last || "&minus;") });
+  if (ins && ins.imp != null) kpis.push({ label: "表示された回数 👀", v: num(ins.imp), sub: "note内で記事が出た回数" });
+  if (hasPV) kpis.push({
+    label: ins ? "読まれた回数（PV）" : "読まれた回数（総PV）",
+    v: num(ins && ins.pv != null ? ins.pv : totPV),
+    sub: ins ? "noteの「ページビュー」と同じ数え方" : "集計時点: " + esc(meta.last || "&minus;"),
+  });
+  if (ins && ins.imp != null && ins.pv != null) kpis.push({ label: "ひらかれ率", v: pct(openRate(ins.imp, ins.pv)), sub: "表示 → 開かれた割合" });
   kpis.push({ label: "もらったスキ 💛", v: num(totLike), sub: "延べ " + num(nLikes) + " 件のありがとう" });
   kpis.push({ label: "もらったコメント 💬", v: num(totCmt), sub: "" });
-  if (hasPV && overallRate != null) kpis.push({ label: "全体スキ率", v: pct(overallRate), sub: "スキ÷PV" });
+  if (hasPV && overallRate != null) kpis.push({ label: "全体スキ率", v: pct(overallRate), sub: ins ? "スキ÷ページビュー" : "スキ÷PV" });
   kpis.push({ label: "スキをくれた人", v: num(uniqLikers) + "<small>人</small>", sub: "うちフォロワー " + num(followerLikers) + " 人" });
   kpis.push({ label: "見込みフォロワー 🌱", v: num(prospects.length) + "<small>人</small>", sub: "未フォローのスキ主さん" });
+  /* 旧「ビュー」との違いの説明。noteの画面と数字が違う理由がこれ1つで分かるようにする。 */
+  var pvNoteHtml = "";
+  if (ins && d.totPVOld != null && ins.pv != null) {
+    pvNoteHtml = '<p class="note">noteは2026年9月のリニューアルで、これまでの「ビュー」を<b>表示された回数（インプレッション）</b>と<b>読まれた回数（ページビュー）</b>に分けました。このレポートのPVは新しい<b>ページビュー</b>＝noteの画面と同じ数字です。分割前の数え方だと ' +
+      num(d.totPVOld) + ' でしたが、あれは一覧に出ただけの回数も混ざっていたので多めに出ていました。</p>';
+  }
+  /* 流入元（アカウント全体・最近28日）。記事ごとの流入元はnoteが出していないので出せない。 */
+  var refHtml = "";
+  if (ins && ins.ref && ins.ref.length) {
+    var refTot = ins.ref.reduce(function (t, r) { return t + (Number(r.count) || 0); }, 0);
+    var refItems = ins.ref.slice(0, 12).map(function (r) { return { label: r.name, v: Number(r.count) || 0 }; });
+    var refRows = ins.ref.slice(0, 12).map(function (r) {
+      return "<tr><td class='ttl'>" + esc(r.name) + "</td><td class='n'>" + num(r.count) + "</td><td class='n'>" +
+        (refTot ? pct((Number(r.count) || 0) / refTot * 100) : "&minus;") + "</td></tr>";
+    }).join("");
+    refHtml = '<div class="twocol"><div class="card">' + barChart(refItems, "f-sky", false, true) + "</div>" +
+      '<div class="card"><div class="tblwrap" style="border:0"><table style="min-width:0"><tr><th>流入元</th><th class="n">件数</th><th class="n">割合</th></tr>' +
+      refRows + "</table></div></div></div>" +
+      '<p class="note">noteの「記事の流入元」と同じデータです（最近28日）。検索エンジンやSNSの名前が上位に来ているほど、note の外から読まれています。<b>どの記事がどこから読まれたか（記事ごとの内訳）と、検索されたキーワードは、noteが出していないので分かりません。</b>そこまで知りたいときは Google Search Console を使ってね。</p>';
+  }
   var kpiHtml = kpis.map(function (k) {
     return '<div class="kpi"><div class="kpi-label">' + k.label + '</div><div class="kpi-v">' + k.v + "</div>" +
       (k.sub ? '<div class="kpi-sub">' + k.sub + "</div>" : "") + "</div>";
@@ -877,21 +941,27 @@ window.__noteBuildHtml = function (d) {
   var artsSorted = arts.slice().sort(function (a, b) {
     return (b.dt ? b.dt.getTime() : 0) - (a.dt ? a.dt.getTime() : 0);
   });
+  var showImp = !!(ins && insArts.length);
   var artHead = "<tr><th>タイトル</th><th>公開日</th>" +
+    (showImp ? "<th class='n'>表示</th>" : "") +
     (hasPV ? "<th class='n'>PV</th>" : "") +
+    (showImp ? "<th class='n'>ひらかれ率</th>" : "") +
     "<th class='n'>スキ</th>" +
     (hasPV ? "<th class='n'>スキ率</th>" : "") +
     "<th class='n'>コメント</th><th>タグ</th></tr>";
   var artRows = artsSorted.map(function (a) {
     var dts = a.dt ? (a.dt.getFullYear() + "/" + (a.dt.getMonth() + 1) + "/" + a.dt.getDate()) : "&minus;";
+    var oR = showImp ? openRate(a.imp, a.read) : null;
     return "<tr><td class='ttl'>" + esc(a.title) + "</td><td>" + dts + "</td>" +
+      (showImp ? "<td class='n'>" + (a.imp == null ? "&minus;" : num(a.imp)) + "</td>" : "") +
       (hasPV ? "<td class='n'>" + num(a.read) + "</td>" : "") +
+      (showImp ? "<td class='n'>" + (oR == null ? "&minus;" : pct(oR)) + "</td>" : "") +
       "<td class='n'>" + num(a.like) + "</td>" +
       (hasPV ? rateCell(a.rate) : "") +
       "<td class='n'>" + num(a.cmt) + "</td>" +
       "<td class='tags'>" + a.tags.map(function (t) { return '<span class="tag">' + esc(t) + "</span>"; }).join(" ") + "</td></tr>";
   }).join("");
-  if (!artRows) artRows = '<tr><td colspan="7" class="empty">記事データがありません</td></tr>';
+  if (!artRows) artRows = '<tr><td colspan="' + (showImp ? 9 : 7) + '" class="empty">記事データがありません</td></tr>';
 
   /* ⑧ スキ率ランキング */
   var rankHtml = "";
@@ -961,7 +1031,11 @@ window.__noteBuildHtml = function (d) {
     var prevOk = !isNaN(prevDt.getTime());
     var prevLabel = prevOk ? (prevDt.getMonth() + 1) + "/" + prevDt.getDate() : "前回";
     var daysAgo = prevOk ? Math.max(1, Math.round((Date.now() - prevDt.getTime()) / 86400000)) : null;
-    var dTotPV = (hasPV && totPV != null && prev.totPV != null) ? totPV - Number(prev.totPV) : null;
+    /* 前回の記録が旧「ビュー」で、今回が新「ページビュー」だと、数え方の違いで大きくマイナスに見えてしまう。
+       出どころが違うときは、差分を出さずに理由だけ書く。 */
+    /* 古い記録には pvSrc が無い＝旧「ビュー」で記録されたもの、とみなす */
+    var pvSrcChanged = (prev.pvSrc || "legacy") !== (d.pvSrc || "legacy");
+    var dTotPV = (hasPV && !pvSrcChanged && totPV != null && prev.totPV != null) ? totPV - Number(prev.totPV) : null;
     var dTotLike = totLike - (Number(prev.totLike) || 0);
     var dTotCmt = totCmt - (Number(prev.totCmt) || 0);
     var dFol = (d.followerCount != null && prev.fol != null) ? Number(d.followerCount) - Number(prev.fol) : null;
@@ -1019,7 +1093,9 @@ window.__noteBuildHtml = function (d) {
     }
 
     diffHtml = '<p class="sec-sub">前回のレポート（' + esc(prevLabel) + (daysAgo != null ? "・" + daysAgo + "日前" : "") + '）とくらべた増え方だよ。</p>' +
-      '<div class="kpis">' + dKpiHtml + "</div>" + moverTable + histHtml +
+      '<div class="kpis">' + dKpiHtml + "</div>" +
+      (pvSrcChanged ? '<p class="note">🔄 noteのリニューアルでPVの数え方が変わったため、今回はPVの比較をお休みしています（前回の記録は古い「ビュー」の数字なので、くらべると減ったように見えてしまいます）。<b>次にレポートを作るときから、またPVの伸びが出ます。</b></p>' : "") +
+      moverTable + histHtml +
       frogTip("記事を投稿した翌日にレポートを作ると、「きのう出したあの記事、どれだけ読まれた？」がここでわかるよ！毎日1回作れば前日との差になるんだ🐸");
   } else {
     diffHtml = '<div class="card"><p class="empty">📌 今回の数字をこのブラウザに保存したよ。<b>次に別の日</b>にレポートを作ると、ここに「前回からどれだけ伸びたか」（記事ごとのPV増・スキ増）が出ます。毎日1回作れば「前日との差」が追えるよ🐸' +
@@ -1042,6 +1118,31 @@ window.__noteBuildHtml = function (d) {
   /* ③c 有料noteの売上（データがある人にだけ表示） */
   var sales = d.sales || null;
   var salesHtml = "";
+  /* メンバーシップ・定期購読マガジンの売上は購入明細APIに出てこないので、
+     noteの新ダッシュボード（GraphQL・過去365日）から別建てで出す。 */
+  var extraSalesHtml = "";
+  if (ins && (ins.membership || ins.magazine)) {
+    var yen2 = function (n) { return "&yen;" + num(Math.round(Number(n) || 0)); };
+    if (ins.membership && ins.membership.length) {
+      extraSalesHtml += '<h3 style="margin:18px 2px 8px;font-size:14.5px">🎪 メンバーシップ（過去365日）</h3>' +
+        '<div class="tblwrap"><table style="min-width:420px"><tr><th>プラン</th><th class="n">売上</th><th class="n">参加</th><th class="n">退会</th></tr>' +
+        ins.membership.map(function (m) {
+          return "<tr><td class='ttl'>" + esc(m.name) + "</td><td class='n'>" + yen2(m.amount) +
+            "</td><td class='n'>" + num(m.joined) + "</td><td class='n'>" + num(m.left) + "</td></tr>";
+        }).join("") + "</table></div>";
+    }
+    if (ins.magazine && ins.magazine.length) {
+      extraSalesHtml += '<h3 style="margin:18px 2px 8px;font-size:14.5px">📚 マガジン（過去365日）</h3>' +
+        '<div class="tblwrap"><table style="min-width:420px"><tr><th>マガジン</th><th class="n">売上</th><th class="n">追加した記事</th><th class="n">フォロワー増</th></tr>' +
+        ins.magazine.map(function (m) {
+          return "<tr><td class='ttl'>" + esc(m.name) + "</td><td class='n'>" + yen2(m.amount) +
+            "</td><td class='n'>" + num(m.added) + "</td><td class='n'>" + num(m.folDiff) + "</td></tr>";
+        }).join("") + "</table></div>";
+    }
+    if (extraSalesHtml) {
+      extraSalesHtml += '<p class="note">メンバーシップと定期購読マガジンは、上の月別グラフ・商品別テーブル（購入明細から集計・直近12か月）には含まれません。こちらはnoteの集計（過去365日）をそのまま表示しています。集計期間が少しちがうので、単純に足し算しないでね。</p>';
+    }
+  }
   if (sales && sales.needVerify) {
     /* noteが「パスワードの再確認」を求めている状態（お金まわりの安全機能）。
        確認を通してから作り直せば売上が出る、と案内するだけ。
@@ -1159,10 +1260,13 @@ window.__noteBuildHtml = function (d) {
       '<div class="twocol" style="margin-top:14px"><div class="card"><h3 style="margin:0 0 10px;font-size:14.5px">📆 月別の売上（直近12か月）</h3>' + barChart(monItems, "f-sun") + "</div>" +
       dailySalesHtml + "</div>" +
       '<div class="tblwrap" style="margin-top:14px"><table style="min-width:520px"><tr><th>有料note・商品</th><th class="n">価格</th><th class="n">販売数</th><th class="n">売上</th></tr>' + salesRows + "</table></div>" +
-      peopleHtml +
+      peopleHtml + extraSalesHtml +
       '<p class="note">金額は販売価格ベース（プラットフォーム利用料などが引かれる前）で、返金分は除いています。日別グラフは購入された日（円）で集計しています。正確な振込額はnoteの「売上管理」画面で確認してね。定期購読マガジン・メンバーシップの売上はここには含まれません。</p>' +
       frogTip("売上とお名前は、あなただけの大事なデータ。ほかの人の名前は最初かくしてあるけど、表示したままスクショ・共有・AIに渡すのはやめてね🐸");
   }
+
+  /* 記事の販売が無くても、メンバーシップ・マガジンの売上だけある人には出す */
+  if (!salesHtml && extraSalesHtml) salesHtml = extraSalesHtml;
 
   var secNo = 0;
   function secTitle(t, sub) {
@@ -1219,6 +1323,7 @@ window.__noteBuildHtml = function (d) {
     ".twocol>.card{flex:1 1 320px;min-width:280px}" +
     ".bars{display:flex;flex-direction:column;gap:4px}" +
     ".bars.split{display:block;column-count:2;column-gap:22px}" +
+    ".bars.wide .bar-label{flex:0 0 108px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}" +
     ".bars.split .bar-row{break-inside:avoid;margin-bottom:4px}" +
     ".bar-row{display:flex;align-items:center;gap:8px;font-size:12.5px}" +
     ".bar-label{flex:0 0 44px;text-align:right;color:var(--sub)}" +
@@ -1300,7 +1405,12 @@ window.__noteBuildHtml = function (d) {
 
     /* ③ KPI */
     secTitle("📊 全体サマリー", "まずはいまの成績をひとめでチェック！") +
-    '<div class="kpis">' + kpiHtml + "</div>" +
+    '<div class="kpis">' + kpiHtml + "</div>" + pvNoteHtml +
+
+    /* ③a 流入元（noteの新ダッシュボード由来・コラボ基本版では非表示） */
+    (d.liteMode || !refHtml ? "" :
+      secTitle("🚪 どこから読まれている？（最近28日）", "noteの外から来たのか、note内で見つけてもらえたのか。記事ごとではなくアカウント全体の数字だよ。") +
+      refHtml) +
 
     /* ③b 前回との比較（コラボ基本版では非表示） */
     (d.liteMode ? "" :
@@ -1331,7 +1441,7 @@ window.__noteBuildHtml = function (d) {
     '<div class="card">' + heatTable(pHeat, SCALE_SPROUT, "hm-pros") + "</div>" +
 
     /* ⑦ 記事別 */
-    secTitle("📝 記事別エンゲージメント", hasPV ? "スキ率のセル色: 緑=20%以上 / 青=10%以上 / 黄=5%以上 / 赤=5%未満。" : "PVデータがないぶん、スキ・コメントでじっくり比較するよ。") +
+    secTitle("📝 記事別エンゲージメント", hasPV ? "スキ率のセル色: 緑=20%以上 / 青=10%以上 / 黄=5%以上 / 赤=5%未満。" + (showImp ? "「ひらかれ率」は 表示 → 開かれた割合＝サムネとタイトルの通信簿。" : "") : "PVデータがないぶん、スキ・コメントでじっくり比較するよ。") +
     '<div class="tblwrap"><table>' + artHead + artRows + "</table></div>" +
 
     /* ⑧ スキ率ランキング（hasPVのみ） */
@@ -1412,6 +1522,18 @@ window.__noteAISection = function (d) {
   L.push('- 合計コメント: ' + (d.totCmt || 0));
   if (hasPV && d.totPV > 0) {
     L.push('- 全体スキ率(スキ÷ビュー): ' + pct(d.totLike || 0, d.totPV));
+  }
+  // noteの新ダッシュボード由来（取れたときだけ）。買い手の名前などの個人情報は入れない。
+  var ins = d.insight || null;
+  if (ins && ins.imp != null && ins.pv != null) {
+    L.push('- 表示回数(インプレッション): ' + ins.imp + '（note内で記事が表示された回数）');
+    L.push('- ひらかれ率(表示→ページビュー): ' + (ins.imp ? ((ins.pv / ins.imp) * 100).toFixed(1) : '0.0') + '%');
+  }
+  if (ins && ins.ref && ins.ref.length) {
+    var rTot = ins.ref.reduce(function (t, r) { return t + (Number(r.count) || 0); }, 0);
+    L.push('- 流入元(最近28日): ' + ins.ref.slice(0, 5).map(function (r) {
+      return r.name + ' ' + (rTot ? Math.round((Number(r.count) || 0) / rTot * 100) : 0) + '%';
+    }).join(' / '));
   }
   if (d.sales && d.sales.count > 0) {
     L.push('- 有料noteの売上(直近12か月・返金除く): ' + d.sales.amount + '円（販売' + d.sales.count + '件）');
@@ -1874,6 +1996,150 @@ window.noteAnalyze = async function (opts) {
       } catch (e) { sales = needVerify ? { needVerify: true } : null; }
     }
 
+    // 2.7) noteの新ダッシュボード（GraphQL）から インプレッション・正確なページビュー・流入元を取る
+    //
+    // 2026-09-08 のダッシュボード刷新で、noteは従来の「ビュー」を2つに分けた:
+    //   インプレッション = note内のいろいろな場所で記事が「表示された」回数
+    //   ページビュー     = 記事が「開かれた」回数
+    // 旧API(/api/v1/stats/pv)の total_pv は分割前の「ビュー」のままなので、
+    // noteの画面のページビューとは一致しない（実測で約1.33倍だった）。
+    // ここで新しい数字が取れたらそちらを正としてレポートに使い、
+    // 取れなければ何も足さずに従来どおり旧APIの数字だけで動く（レポートは絶対に止めない）。
+    //
+    // 呼び出し方（2026-09-17 実アカウントで確認済み）:
+    //   ① POST /api/v3/graphql/auth（note.com・Cookie認証・XSRFヘッダー付き）→ 201
+    //      Cookie note_gql_auth_token にトークンが入る（HttpOnlyではないのでJSから読める）
+    //   ② POST https://graphql.note.com/graphql に Bearer で問い合わせ
+    //      別オリジンだが CORS で note.com からの呼び出しが許可されている。
+    //      ※Cookieは送らない（allow-credentials が無いので送ると失敗する）
+    const GQL_URL = 'https://graphql.note.com/graphql';
+    const gqlNum = (v) => (v == null || isNaN(Number(v)) ? null : Number(v));
+    const readGqlCookie = () => {
+      const m = document.cookie.match(/note_gql_auth_token=([^;]+)/);
+      try { return m ? decodeURIComponent(m[1]) : ''; } catch (e) { return m ? m[1] : ''; }
+    };
+    const mintGqlToken = async () => {
+      if (reqCount >= MAX_REQUESTS) return '';
+      const hdrs = { 'x-requested-with': 'XMLHttpRequest', 'content-type': 'application/json' };
+      try {
+        const x = decodeURIComponent((document.cookie.match(/XSRF-TOKEN=([^;]+)/) || [])[1] || '');
+        if (x) hdrs['x-xsrf-token'] = x;
+      } catch (e) {}
+      const r = await fetch('/api/v3/graphql/auth', { method: 'POST', credentials: 'include', headers: hdrs, body: '{}' });
+      reqCount++;
+      if (!r.ok) return '';
+      return readGqlCookie();
+    };
+    const Q_SUM = 'query($u:DashboardPeriodUnit!,$d:Datetime!){dashboardSummary(unit:$u,date:$d){lastUpdatedAt metrics{pageViewCount impressionCount likeCount commentCount salesAmount}}}';
+    const Q_NOTES = 'query($u:DashboardPeriodUnit!,$d:Datetime!,$f:Int!,$a:String){dashboardNoteListConnection(unit:$u,date:$d,order:PAGE_VIEW_COUNT_DESC,first:$f,after:$a){pageInfo{hasNextPage endCursor}edges{node{note{title link{absoluteUrl}}metrics{pageViewCount impressionCount likeCount commentCount salesAmount}}}}}';
+    const Q_REF = 'query($u:DashboardPeriodUnit!,$d:Datetime!){dashboardNoteReferrersChart(unit:$u,date:$d){legend{name count color}}}';
+    const Q_MEM = 'query($u:DashboardPeriodUnit!,$d:Datetime!,$f:Int!){dashboardMembershipPlanListConnection(unit:$u,date:$d,first:$f){edges{node{plan{name status}metrics{salesAmount joinedMemberCount leftMemberCount}}}}}';
+    const Q_MAG = 'query($u:DashboardPeriodUnit!,$d:Datetime!,$f:Int!){dashboardMagazineListConnection(unit:$u,date:$d,first:$f){edges{node{magazine{name status isPaid}metrics{salesAmount addedNoteCount followCountDiff}}}}}';
+    let insight = null;
+    try {
+      let tok = readGqlCookie() || await mintGqlToken();
+      if (tok) {
+        const nowIso = new Date().toISOString();
+        const gqlRaw = async (q, v) => {
+          if (reqCount >= MAX_REQUESTS) throw new Error('CAP');
+          const r = await fetch(GQL_URL, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json', authorization: 'Bearer ' + tok },
+            body: JSON.stringify({ query: q, variables: v }),
+          });
+          reqCount++;
+          if (!r.ok) return { http: r.status, data: null };
+          let j = null; try { j = await r.json(); } catch (e) {}
+          return { http: 200, data: (j && j.data) || null };
+        };
+        // トークンが古いと401になるので、そのときだけ取り直して1度リトライする
+        const gq = async (q, v) => {
+          let r = await gqlRaw(q, v); await sleep(DELAY);
+          if (r.http === 401 || r.http === 403) {
+            tok = await mintGqlToken();
+            if (!tok) return null;
+            r = await gqlRaw(q, v); await sleep(DELAY);
+          }
+          return r.data;
+        };
+        const sum = await gq(Q_SUM, { u: 'ALL', d: nowIso });
+        const sm = sum && sum.dashboardSummary;
+        if (sm && sm.metrics) {
+          UI.status('noteの新しい数字を読んでいます…', 'インプレッション・流入元', null);
+          insight = {
+            pv: gqlNum(sm.metrics.pageViewCount), imp: gqlNum(sm.metrics.impressionCount),
+            like: gqlNum(sm.metrics.likeCount), cmt: gqlNum(sm.metrics.commentCount),
+            sales: gqlNum(sm.metrics.salesAmount), at: sm.lastUpdatedAt || null,
+            byKey: {}, nArt: 0, ref: null, refDays: 28, membership: null, magazine: null,
+          };
+          // 記事別（ページビュー順・100件ずつ。記事キーは記事URLの /n/xxxx から取る）
+          let after = null;
+          for (let gp = 0; gp < 10; gp++) {
+            const nd = await gq(Q_NOTES, { u: 'ALL', d: nowIso, f: 100, a: after });
+            const conn = nd && nd.dashboardNoteListConnection;
+            if (!conn) break;
+            (conn.edges || []).forEach((e) => {
+              const n = e && e.node; if (!n || !n.note || !n.metrics) return;
+              const url = (n.note.link && n.note.link.absoluteUrl) || '';
+              const k = (url.match(/\/n\/([A-Za-z0-9]+)/) || [])[1];
+              if (!k) return;
+              insight.byKey[k] = {
+                pv: gqlNum(n.metrics.pageViewCount), imp: gqlNum(n.metrics.impressionCount),
+                like: gqlNum(n.metrics.likeCount), cmt: gqlNum(n.metrics.commentCount),
+                sales: gqlNum(n.metrics.salesAmount),
+              };
+              insight.nArt++;
+            });
+            if (!conn.pageInfo || !conn.pageInfo.hasNextPage) break;
+            after = conn.pageInfo.endCursor;
+          }
+          // 流入元（最近28日ぶん。記事ごとの流入元はnoteが出していないのでアカウント全体のみ）
+          const rf = await gq(Q_REF, { u: 'LAST_28_DAYS', d: nowIso });
+          const leg = rf && rf.dashboardNoteReferrersChart && rf.dashboardNoteReferrersChart.legend;
+          if (Array.isArray(leg) && leg.length) {
+            insight.ref = leg.map((x) => ({ name: String((x && x.name) || ''), count: gqlNum(x && x.count) || 0 }))
+              .filter((x) => x.name).sort((a, b) => b.count - a.count);
+          }
+          // メンバーシップ・マガジンの売上（過去365日）は売上セクションと同じ機能追加版限定
+          if (window.__NOTE_PLUS) {
+            const mem = await gq(Q_MEM, { u: 'LAST_365_DAYS', d: nowIso, f: 50 });
+            const mc = mem && mem.dashboardMembershipPlanListConnection;
+            if (mc && Array.isArray(mc.edges)) {
+              const rows = mc.edges.map((e) => {
+                const n = e && e.node; if (!n || !n.plan || !n.metrics) return null;
+                return { name: String(n.plan.name || ''), status: String(n.plan.status || ''),
+                  amount: gqlNum(n.metrics.salesAmount) || 0,
+                  joined: gqlNum(n.metrics.joinedMemberCount) || 0, left: gqlNum(n.metrics.leftMemberCount) || 0 };
+              }).filter(Boolean);
+              if (rows.length) insight.membership = rows;
+            }
+            const mag = await gq(Q_MAG, { u: 'LAST_365_DAYS', d: nowIso, f: 50 });
+            const gc = mag && mag.dashboardMagazineListConnection;
+            if (gc && Array.isArray(gc.edges)) {
+              const rows = gc.edges.map((e) => {
+                const n = e && e.node; if (!n || !n.magazine || !n.metrics) return null;
+                return { name: String(n.magazine.name || ''), paid: !!n.magazine.isPaid,
+                  amount: gqlNum(n.metrics.salesAmount) || 0, added: gqlNum(n.metrics.addedNoteCount) || 0,
+                  folDiff: gqlNum(n.metrics.followCountDiff) || 0 };
+              }).filter(Boolean).filter((r) => r.paid || r.amount > 0);
+              if (rows.length) insight.magazine = rows;
+            }
+          }
+        }
+      }
+    } catch (e) { insight = null; }
+
+    // 記事ごとの数字を新しい定義に入れ替える（旧ビューは readOld に残して、レポートで併記する）
+    if (insight && insight.nArt) {
+      arts.forEach((a) => {
+        const m = insight.byKey[a.key];
+        if (!m) return;
+        a.readOld = (a.read == null ? null : a.read);
+        if (m.pv != null) a.read = m.pv;
+        if (m.imp != null) a.imp = m.imp;
+      });
+    }
+
     // 3) 各記事のスキ
     let allLikes = [];
     for (let i = 0; i < arts.length; i++) {
@@ -1908,7 +2174,13 @@ window.noteAnalyze = async function (opts) {
     const nArt = arts.length || 1;
     const totLike = arts.reduce((s, a) => s + a.like, 0);
     const totCmt = arts.reduce((s, a) => s + a.comment, 0);
-    const totPV = hasPV ? arts.reduce((s, a) => s + (a.read || 0), 0) : null;
+    const hasPV2 = hasPV || !!(insight && insight.nArt);
+    const totPV = hasPV2 ? arts.reduce((s, a) => s + (a.read || 0), 0) : null;
+    // 旧「ビュー」の合計（noteの新しいページビューとの違いをレポートで説明するために持っておく）
+    const totPVOld = hasPV ? arts.reduce((s, a) => s + ((a.readOld != null ? a.readOld : a.read) || 0), 0) : null;
+    // PVの数え方が変わった日をまたぐと「前回とくらべて」が大きくマイナスに見えてしまうので、
+    // どちらの数字で記録したかをスナップショットに残して、違うときは比較を出さない。
+    const pvSrc = (insight && insight.nArt) ? 'gql' : 'legacy';
     const hourC = {}, wdC = {}, heat = {}, pHeat = {}, uLike = {}, uMeta = {}, uHours = {}, dayC = {};
     const dayKey = (dt) => dt.getFullYear() + '-' + String(dt.getMonth() + 1).padStart(2, '0') + '-' + String(dt.getDate()).padStart(2, '0');
     allLikes.forEach((lk) => {
@@ -1939,7 +2211,7 @@ window.noteAnalyze = async function (opts) {
     let prevSnap = null, snapSaved = false, snapHist = null;
     try {
       const SNAP_KEY = 'noteReportSnaps_' + user;
-      const nowSnap = { at: Date.now(), totPV, totLike, totCmt, fol: followers.size, arts: {} };
+      const nowSnap = { at: Date.now(), totPV, totLike, totCmt, fol: followers.size, pvSrc, arts: {} };
       arts.forEach((a) => { nowSnap.arts[a.key] = [(a.read == null ? null : a.read), a.like || 0, a.comment || 0]; });
       let snaps = [];
       try { const raw = JSON.parse(localStorage.getItem(SNAP_KEY) || '[]'); if (Array.isArray(raw)) snaps = raw; } catch (e) {}
@@ -2011,7 +2283,7 @@ window.noteAnalyze = async function (opts) {
     // 記録（スナップショット保存）は全チャンネルで行う。
     // 機能追加版に乗り換えた日から、それまでに貯まった分もグラフに出せるようにするため。
 
-    const data = { user, meta, hasPV, arts, totLike, totCmt, totPV, nArt, hourC, wdC, dayC, heat, pHeat, uLike, uMeta, uHours, fans, prospects, tagMap, followers, followerCount: followers.size, prevSnap, snapSaved, snapHist, liteMode, sales, credit, nLikes: allLikes.length, heroImg, WD, esc, peak };
+    const data = { user, meta, hasPV: hasPV2, hasPVOld: hasPV, insight, totPVOld, pvSrc, arts, totLike, totCmt, totPV, nArt, hourC, wdC, dayC, heat, pHeat, uLike, uMeta, uHours, fans, prospects, tagMap, followers, followerCount: followers.size, prevSnap, snapSaved, snapHist, liteMode, sales, credit, nLikes: allLikes.length, heroImg, WD, esc, peak };
     let html = window.__noteBuildHtml(data);
     try {
       if (notice && notice.enabled !== false && notice.message) {

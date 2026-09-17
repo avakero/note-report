@@ -347,6 +347,94 @@ let captured = null;
   if (r12c.htmlLen <= noBannerLen()) throw new Error('run12c: fallback banner missing');
   console.log('run12c (plus用ファイルなし: 従来どおりチャンネル用に落ちる) OK');
 
+  // --- 実行13回目: noteの新ダッシュボード（GraphQL）からインプレッション・流入元を取る ---
+  // ブラウザでしか無い document.cookie を用意する（本体は Cookie からトークンを読む）
+  global.document = { cookie: 'XSRF-TOKEN=xsrf-dummy; note_gql_auth_token=tok-dummy' };
+  window.__NOTE_PLUS = true;
+  let gqlCalls = [];
+  const gqlMock = async (u, init) => {
+    if (typeof u === 'string' && u.indexOf('graphql.note.com') >= 0) {
+      const body = JSON.parse((init && init.body) || '{}');
+      const q = body.query || '';
+      gqlCalls.push(q.slice(0, 40));
+      const auth = (init && init.headers && init.headers.authorization) || '';
+      if (auth !== 'Bearer tok-dummy') throw new Error('run13: Bearer トークンが付いていない: ' + auth);
+      if (init.credentials) throw new Error('run13: GraphQLにCookieを送ってはいけない（CORSで弾かれる）');
+      const ok = (data) => ({ ok: true, status: 200, json: async () => ({ data }) });
+      if (q.indexOf('dashboardSummary') >= 0) {
+        return ok({ dashboardSummary: { lastUpdatedAt: '2026-09-17T00:00:00.000Z',
+          metrics: { pageViewCount: 5633, impressionCount: 64167, likeCount: 47, commentCount: 4, salesAmount: 10245 } } });
+      }
+      if (q.indexOf('dashboardNoteListConnection') >= 0) {
+        return ok({ dashboardNoteListConnection: { pageInfo: { hasNextPage: false, endCursor: null }, edges: [
+          { node: { note: { title: '記事その1', link: { absoluteUrl: 'https://note.com/testuser/n/a1' } },
+            metrics: { pageViewCount: 400, impressionCount: 8000, likeCount: 30, commentCount: 3, salesAmount: 0 } } },
+          { node: { note: { title: '記事その2', link: { absoluteUrl: 'https://note.com/testuser/n/a2' } },
+            metrics: { pageViewCount: 150, impressionCount: 900, likeCount: 17, commentCount: 1, salesAmount: 0 } } },
+        ] } });
+      }
+      if (q.indexOf('dashboardNoteReferrersChart') >= 0) {
+        return ok({ dashboardNoteReferrersChart: { legend: [
+          { name: 'note.com', count: 700, color: '#1' }, { name: 'Google', count: 250, color: '#2' }, { name: 'X', count: 50, color: '#3' },
+        ] } });
+      }
+      if (q.indexOf('dashboardMembershipPlanListConnection') >= 0) {
+        return ok({ dashboardMembershipPlanListConnection: { edges: [
+          { node: { plan: { name: 'ゆるサポートプラン', status: 'OPEN' }, metrics: { salesAmount: 3000, joinedMemberCount: 4, leftMemberCount: 1 } } },
+        ] } });
+      }
+      if (q.indexOf('dashboardMagazineListConnection') >= 0) {
+        return ok({ dashboardMagazineListConnection: { edges: [
+          { node: { magazine: { name: '月刊あばけろ', status: 'OPEN', isPaid: true }, metrics: { salesAmount: 1500, addedNoteCount: 2, followCountDiff: 5 } } },
+        ] } });
+      }
+      return ok({});
+    }
+    if (typeof u === 'string' && u.indexOf('/api/v3/graphql/auth') >= 0) return { ok: true, status: 201, json: async () => ({}) };
+    return origFetch(u);
+  };
+  global.fetch = gqlMock;
+  localStorage.setItem('noteAnalyzeLastRun', '0');
+  await window.noteAnalyze({ download: false, delay: 0 });
+  const ig = captured.insight;
+  if (!ig) throw new Error('run13: insight が取れていない');
+  if (ig.pv !== 5633 || ig.imp !== 64167) throw new Error('run13: サマリーの数字が違う ' + JSON.stringify(ig));
+  if (ig.nArt !== 2) throw new Error('run13: 記事別が取れていない ' + ig.nArt);
+  if (!ig.ref || ig.ref[0].name !== 'note.com' || ig.ref[0].count !== 700) throw new Error('run13: 流入元が違う ' + JSON.stringify(ig.ref));
+  if (!ig.membership || ig.membership[0].amount !== 3000) throw new Error('run13: メンバーシップが違う ' + JSON.stringify(ig.membership));
+  if (!ig.magazine || ig.magazine[0].amount !== 1500) throw new Error('run13: マガジンが違う ' + JSON.stringify(ig.magazine));
+  if (captured.pvSrc !== 'gql') throw new Error('run13: pvSrc が gql になっていない');
+  // 記事のPVが新しい数字に入れ替わり、旧ビューは readOld に残る
+  const a1 = captured.arts.find((a) => a.key === 'a1');
+  if (!a1 || a1.read !== 400 || a1.imp !== 8000 || a1.readOld !== 500) throw new Error('run13: 記事の入れ替えが違う ' + JSON.stringify(a1));
+  if (captured.totPVOld !== 780) throw new Error('run13: 旧ビュー合計が違う ' + captured.totPVOld);
+  const html13 = realBuild(captured);
+  for (const needle of ['表示された回数', 'ひらかれ率', 'どこから読まれている', 'note.com', 'Google',
+    'メンバーシップ（過去365日）', 'ゆるサポートプラン', 'マガジン（過去365日）', '分割前の数え方だと 780']) {
+    if (!html13.includes(needle)) throw new Error('run13 html missing: ' + needle);
+  }
+  const ai13 = window.__noteAISection(captured);
+  if (!ai13.includes('表示回数(インプレッション): 64167')) throw new Error('run13: AIプロンプトにインプレッションが無い');
+  if (!ai13.includes('流入元(最近28日): note.com 70%')) throw new Error('run13: AIプロンプトに流入元が無い');
+  console.log('run13 (GraphQL: インプレッション・流入元・メンバーシップ) OK');
+
+  // --- 実行14回目: GraphQLが落ちても、従来の数字でレポートは作れる ---
+  global.fetch = async (u, init) => {
+    if (typeof u === 'string' && (u.indexOf('graphql') >= 0)) return { ok: false, status: 500, json: async () => ({}) };
+    return origFetch(u);
+  };
+  global.document = { cookie: '' };
+  localStorage.setItem('noteAnalyzeLastRun', '0');
+  await window.noteAnalyze({ download: false, delay: 0 });
+  if (captured.insight != null) throw new Error('run14: GraphQL失敗時は insight を null にする');
+  if (captured.pvSrc !== 'legacy') throw new Error('run14: pvSrc は legacy に戻るべき');
+  const html14 = realBuild(captured);
+  if (html14.includes('表示された回数')) throw new Error('run14: インプレッションを出してはいけない');
+  if (html14.includes('どこから読まれている')) throw new Error('run14: 流入元を出してはいけない');
+  if (!html14.includes('読まれた回数（総PV）')) throw new Error('run14: 従来のPV表示に戻っていない');
+  console.log('run14 (GraphQLが落ちたら従来どおり) OK');
+
+  delete global.document;
   delete window.__NOTE_PLUS;
   delete window.__NOTE_CHANNEL;
   delete window.__NOTE_BASE;

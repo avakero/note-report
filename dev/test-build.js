@@ -187,5 +187,46 @@ const people7 = html7.split('チップをくれた人')[1].split('金額は販�
 if (/onclick|<script/i.test(people7)) throw new Error('case7: no inline JS allowed in the people list');
 console.log('case7 (チップ・購入者リスト: 伏せ字トグル) OK');
 
+// --- ケース8: インプレッション・ひらかれ率・流入元・PVの数え方が変わったときの比較 ---
+const artsIns = artsPaid.map((a) => (a.key === 'a1' ? { ...a, imp: 8000 } : { ...a, imp: 900 }));
+const insight8 = {
+  pv: 5633, imp: 64167, like: 47, cmt: 4, sales: 10245, at: '2026-09-17T00:00:00.000Z', nArt: 3,
+  byKey: {}, refDays: 28,
+  ref: [{ name: 'note.com', count: 700 }, { name: 'Google', count: 250 }, { name: 'X', count: 50 }],
+  membership: [{ name: 'ゆるサポートプラン', status: 'OPEN', amount: 3000, joined: 4, left: 1 }],
+  magazine: [{ name: '月刊あばけろ', paid: true, amount: 1500, added: 2, folDiff: 5 }],
+};
+let html8 = window.__noteBuildHtml({ ...base, arts: artsIns, insight: insight8, totPVOld: 780, pvSrc: 'gql',
+  prevSnap: { ...prevSnap, pvSrc: 'legacy' }, snapHist, snapSaved: true, sales: sales5 });
+for (const needle of [
+  '表示された回数',            // インプレッションKPI
+  '64,167',
+  'ひらかれ率',
+  '読まれた回数（PV）',
+  'noteの「ページビュー」と同じ数え方',
+  '分割前の数え方だと 780',     // 旧ビューの説明
+  'どこから読まれている',       // 流入元セクション
+  'Google Search Console',     // 記事別の流入元は出せない旨の案内
+  'メンバーシップ（過去365日）',
+  'ゆるサポートプラン',
+  '月刊あばけろ',
+  'PVの比較をお休み',           // 数え方が変わった日の案内
+]) {
+  if (!html8.includes(needle)) throw new Error('case8 missing: ' + needle);
+}
+// 差分KPIの「PVの伸び」だけを見る（『1日ごとのPVの伸び』グラフの見出しと区別するため）
+if (html8.includes('kpi-label\">PVの伸び<')) throw new Error('case8: 数え方が変わったときはPV差分を出してはいけない');
+// 記事別テーブルに「表示」「ひらかれ率」列が増える
+const head8 = html8.split('記事別エンゲージメント')[1].split('</tr>')[0];
+if (!head8.includes('表示') || !head8.includes('ひらかれ率')) throw new Error('case8: 記事別テーブルの列が増えていない');
+console.log('case8 (インプレッション・流入元・メンバーシップ) OK');
+
+// --- ケース8b: insight が無いときは今までどおりの見た目 ---
+let html8b = window.__noteBuildHtml({ ...base, prevSnap: { ...prevSnap, pvSrc: 'legacy' }, pvSrc: 'legacy', snapSaved: true });
+if (html8b.includes('表示された回数') || html8b.includes('どこから読まれている')) throw new Error('case8b: insightなしで新セクションが出ている');
+if (!html8b.includes('読まれた回数（総PV）')) throw new Error('case8b: 従来のPV表示が無い');
+if (!html8b.includes('kpi-label\">PVの伸び<')) throw new Error('case8b: 同じ数え方どうしならPV差分は出す');
+console.log('case8b (insightなし: 従来どおり) OK');
+
 fs.writeFileSync(require('path').join(__dirname, 'report-case2.html'), html2);
 console.log('ALL OK');

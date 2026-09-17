@@ -668,6 +668,10 @@ window.__noteBuildHtml = function (d) {
     insArts.reduce(function (t, a) { return t + Number(a.imp || 0); }, 0),
     insArts.reduce(function (t, a) { return t + Number(a.read || 0); }, 0)) : null;
 
+  /* 各アクションは { icon, title, lead, time, when, body }。
+     lead = 「結局なにをすればいいか」を1行で（カードの主役。ここだけ読めば動ける）。
+     body = その根拠（「なぜ？」ボタンを押したときだけ開く）。
+     time / when = 所要時間と「いつやるか」の目安チップ。迷わず選べるようにするため。 */
   var actions = [];
 
   /* (1) 投稿ベスト時間帯 */
@@ -675,14 +679,18 @@ window.__noteBuildHtml = function (d) {
   var topHours = topEntries(hourC, 3);
   if (bestC || topHours.length) {
     var body1 = "";
+    var lead1 = "";
     if (bestC) {
+      var postH = (bestC.h + 23) % 24; /* 山の1時間前 */
+      lead1 = "次の投稿は <b>" + esc(WD[bestC.wd] || "?") + "曜 " + postH + "〜" + bestC.h + "時</b> に出してみよう";
       body1 += "スキが一番集まっているのは<b>" + esc(WD[bestC.wd] || "?") + "曜 " + bestC.h + "時台</b>（期間内 " + num(bestC.v) + " 件）。";
     }
     if (topHours.length) {
+      if (!lead1) lead1 = "<b>" + esc(topHours[0].key) + "時台</b> の少し前に投稿してみよう";
       body1 += "全体でも <b>" + safePeak(hourC, 3) + "</b> に反応が集中しています。";
     }
     body1 += "この山の<b>1〜2時間前に投稿</b>しておくと、初速のスキがぐっと乗りやすくなりますよ。";
-    actions.push({ icon: "🕗", title: "投稿は「反応の山」の直前に", body: body1 });
+    actions.push({ icon: "🕗", title: "投稿は「反応の山」の直前に", lead: lead1, time: "かんたん", when: "次の投稿で", body: body1 });
   }
 
   /* (2) 見込みフォロワーが動く時間 */
@@ -690,11 +698,12 @@ window.__noteBuildHtml = function (d) {
   var pTop = topEntries(pAgg, 3);
   var pBest = peakCell(pHeat);
   if (pTop.length) {
+    var lead2 = "<b>" + esc(pTop[0].key) + "時台</b> にコメント巡回して、新しい読者さんと出会おう";
     var body2 = "未フォローのスキ主（見込みフォロワー <b>" + num(prospects.length) + " 人</b>）が動くのは <b>" +
       pTop.map(function (e) { return e.key + "時台(" + e.v + ")"; }).join("・") + "</b>。";
     if (pBest) body2 += "特に<b>" + esc(WD[pBest.wd] || "?") + "曜 " + pBest.h + "時台</b>（" + num(pBest.v) + " 件）が濃い時間です。";
     body2 += "フォロワーの山とズレているなら、この時間帯の<b>投稿・コメント巡回</b>が新しい出会いを増やす近道です。";
-    actions.push({ icon: "🌱", title: "見込み客に届く時間を狙う", body: body2 });
+    actions.push({ icon: "🌱", title: "見込み客に届く時間を狙う", lead: lead2, time: "5〜10分", when: "今日から", body: body2 });
   }
 
   /* (3) 伸ばす型（スキ率上位の共通点） hasPV のみ */
@@ -706,13 +715,14 @@ window.__noteBuildHtml = function (d) {
     top3.forEach(function (a) { a.tags.forEach(function (t) { tagCnt[t] = (tagCnt[t] || 0) + 1; }); });
     var commonTags = Object.keys(tagCnt).filter(function (t) { return tagCnt[t] >= 2; })
       .sort(function (a, b) { return tagCnt[b] - tagCnt[a]; }).slice(0, 3);
+    var lead3 = "「<b>" + esc(top3[0].title) + "</b>」の続編・横展開を、次の1本に";
     var body3 = "スキ率トップは「<b>" + esc(top3[0].title) + "</b>」<b>" + pct(top3[0].rate) + "</b>（PV " + num(top3[0].read) + "・スキ " + num(top3[0].like) + "）。";
     if (top3[1]) body3 += "続いて「" + esc(top3[1].title) + "」" + pct(top3[1].rate) + (top3[2] ? "、「" + esc(top3[2].title) + "」" + pct(top3[2].rate) : "") + "。";
     if (commonTags.length) {
       body3 += "上位に共通するタグは <b>" + commonTags.map(function (t) { return esc(t); }).join(" ") + "</b>。";
     }
     body3 += "全体平均 " + pct(overallRate) + " を大きく超えるこの<b>「刺さった型」の続編・横展開</b>が次の1本の最有力候補です。";
-    actions.push({ icon: "🚀", title: "「刺さった型」をもう一度", body: body3 });
+    actions.push({ icon: "🚀", title: "「刺さった型」をもう一度", lead: lead3, time: "じっくり", when: "次の1本", body: body3 });
   }
 
   /* (4) 改善候補: PVが多いのにスキ率が低い記事 hasPV のみ */
@@ -722,11 +732,12 @@ window.__noteBuildHtml = function (d) {
       return (a.read || 0) >= avgRead && a.rate < overallRate * 0.5;
     }).sort(function (a, b) { return (b.read || 0) - (a.read || 0); }).slice(0, 2);
     if (fixes.length) {
+      var lead4 = "「<b>" + esc(fixes[0].title) + "</b>」の冒頭と結論を書き直そう";
       var body4 = fixes.map(function (a) {
         return "「<b>" + esc(a.title) + "</b>」はPV " + num(a.read) + " と多く読まれているのにスキ率 <b>" + pct(a.rate) + "</b>（全体平均 " + pct(overallRate) + "）";
       }).join("。");
       body4 += "。タイトルで人は届いています。<b>冒頭の共感フックと結論の先出し</b>を見直すと、いちばん伸びしろが大きい記事です。";
-      actions.push({ icon: "🔧", title: "「読まれているのに刺さっていない」記事を磨く", body: body4 });
+      actions.push({ icon: "🔧", title: "「読まれているのに刺さっていない」記事を磨く", lead: lead4, time: "30分", when: "今週", body: body4 });
     }
   }
 
@@ -737,13 +748,14 @@ window.__noteBuildHtml = function (d) {
       return o != null && o < avgOpen * 0.8 && a.rate != null && a.rate >= overallRate && (a.imp || 0) >= 100;
     }).sort(function (a, b) { return (b.imp || 0) - (a.imp || 0); }).slice(0, 2);
     if (missed.length) {
+      var lead4b = "「<b>" + esc(missed[0].title) + "</b>」のサムネとタイトルだけ差し替えよう";
       var body4b = missed.map(function (a) {
         return "「<b>" + esc(a.title) + "</b>」は " + num(a.imp) + " 回も表示されたのに、ひらかれ率 <b>" +
           pct(openRate(a.imp, a.read)) + "</b>（平均 " + pct(avgOpen) + "）。でも読んだ人のスキ率は " +
           pct(a.rate) + " と平均以上";
       }).join("。");
       body4b += "。<b>中身は刺さっているのに、見出し画像とタイトルで損をしています。</b>ここを変えるのがいちばん費用対効果の高いリライトです。";
-      actions.push({ icon: "🔥", title: "惜しい記事 — サムネとタイトルだけ直そう", body: body4b });
+      actions.push({ icon: "🔥", title: "惜しい記事 — サムネとタイトルだけ直そう", lead: lead4b, time: "10分", when: "今日", body: body4b });
     }
   }
 
@@ -758,9 +770,10 @@ window.__noteBuildHtml = function (d) {
     var body5 = "未フォローなのに何度もスキをくれているのは " + names + "。すでに好意的な相手なので、<b>お礼コメントやフォロー返し</b>が最も届きやすい層です。";
     var u0 = pTop4[0][0];
     var h0 = hoursOf(u0);
+    var lead5 = "<b>" + nickOf(u0) + " さん</b>にお礼コメントかフォロー返しをしよう";
     if (h0 !== "&minus;") body5 += "筆頭の " + nickOf(u0) + " さんの活動時間は <b>" + h0 + "</b>。この時間に反応すると気づかれやすいです。";
-    body5 += "全リストは下の「⑩ 見込みフォロワー」表へ。";
-    actions.push({ icon: "🤝", title: "声かけ候補（フォロー返し・お礼の優先順）", body: body5 });
+    body5 += "全リストは下の「見込みフォロワー」表へ。";
+    actions.push({ icon: "🤝", title: "声かけ候補（フォロー返し・お礼の優先順）", lead: lead5, time: "5分", when: "今日", body: body5 });
   }
 
   /* (6) コメントが生まれる記事 → 返信で常連化 */
@@ -768,10 +781,11 @@ window.__noteBuildHtml = function (d) {
     .sort(function (a, b) { return b.cmt - a.cmt; })[0];
   if (talky && totLike > 0) {
     var cRatio = totCmt / totLike * 100;
+    var lead6 = "コメントには<b>当日中に返信</b>しよう" + (topHours.length ? "（" + esc(topHours[0].key) + "時台のあとにまとめてでOK）" : "");
     var body6 = "コメント最多は「<b>" + esc(talky.title) + "</b>」の <b>" + num(talky.cmt) + " 件</b>（スキ " + num(talky.like) + " 件）。全体でもスキ100件あたりコメント <b>" + cRatio.toFixed(1) + " 件</b>と対話が生まれています。";
     body6 += "コメントには<b>当日中の返信</b>を。";
     if (topHours.length) body6 += "通知が集まる <b>" + topHours[0].key + "時台</b> の後にまとめて返すと効率的です。";
-    actions.push({ icon: "💬", title: "コメント返信を「常連づくり」の場所にする", body: body6 });
+    actions.push({ icon: "💬", title: "コメント返信を「常連づくり」の場所にする", lead: lead6, time: "毎日5分", when: "毎日", body: body6 });
   }
 
   actions = actions.slice(0, 6);
@@ -785,9 +799,9 @@ window.__noteBuildHtml = function (d) {
     var mx = 0;
     items.forEach(function (it) { if (it.v > mx) mx = it.v; });
     if (!items.length || mx === 0) return '<p class="empty">データはまだないみたい。これからが楽しみ！🌱</p>';
-    return '<div class="bars' + (split ? " split" : "") + (wideLabel ? " wide" : "") + '">' + items.map(function (it) {
+    return '<div class="bars' + (split ? " split" : "") + (wideLabel ? " wide" : "") + '">' + items.map(function (it, i2) {
       var w = Math.max(1.5, it.v / mx * 100);
-      return '<div class="bar-row">' +
+      return '<div class="bar-row" style="--i:' + Math.min(i2, 40) + '">' +
         '<span class="bar-label">' + esc(it.label) + '</span>' +
         '<span class="bar-track"><span class="bar-fill ' + colorVar + '" style="width:' + w.toFixed(1) + '%"></span></span>' +
         '<span class="bar-val">' + num(it.v) + '</span></div>';
@@ -882,10 +896,20 @@ window.__noteBuildHtml = function (d) {
   var meta = d.meta || {};
 
   /* ② 次の一手 */
+  /* カード = 上段（番号・所要時間・いつ・やった！）＋ 結論1行（lead）＋「なぜ？」ボタンで開く根拠（body）。
+     チェックと開閉はCSSだけ（レポート内のJSはスマホのiframeだとnoteのCSPで動かないため）。 */
   var actHtml = actions.length ? actions.map(function (a, i) {
-    return '<div class="act"><div class="act-no">' + (i + 1) + '</div>' +
+    var n = i + 1;
+    return '<div class="act">' +
+      '<input type="checkbox" class="act-chk" id="act-' + n + '">' +
+      '<div class="act-top"><div class="act-no">' + n + "</div>" +
+      '<span class="chip t">⏱ ' + esc(a.time) + '</span><span class="chip w">📅 ' + esc(a.when) + "</span>" +
+      '<label class="act-tick" for="act-' + n + '"><span class="tk-off">やった？</span><span class="tk-on">✅ やった！</span></label></div>' +
       '<div class="act-body"><div class="act-title">' + a.icon + " " + a.title + "</div>" +
-      '<p>' + a.body + "</p></div></div>";
+      '<p class="act-lead">' + a.lead + "</p>" +
+      '<input type="checkbox" class="why-chk" id="why-' + n + '">' +
+      '<label class="why-btn" for="why-' + n + '"><span class="w-off">なぜ？ 根拠を見る ▾</span><span class="w-on">とじる ▴</span></label>' +
+      '<p class="act-why">' + a.body + "</p></div></div>";
   }).join("") : '<p class="empty">提案を出すのに十分なデータがまだありません。まずは投稿を続けてみましょう。焦らずコツコツで大丈夫🐸</p>';
 
   /* ③ KPI */
@@ -896,13 +920,14 @@ window.__noteBuildHtml = function (d) {
     label: ins ? "読まれた回数（PV）" : "読まれた回数（総PV）",
     v: num(ins && ins.pv != null ? ins.pv : totPV),
     sub: ins ? "noteの「ページビュー」と同じ数え方" : "集計時点: " + esc(meta.last || "&minus;"),
+    big: true,
   });
   if (ins && ins.imp != null && ins.pv != null) kpis.push({ label: "ひらかれ率", v: pct(openRate(ins.imp, ins.pv)), sub: "表示 → 開かれた割合" });
-  kpis.push({ label: "もらったスキ 💛", v: num(totLike), sub: "延べ " + num(nLikes) + " 件のありがとう" });
+  kpis.push({ label: "もらったスキ 💛", v: num(totLike), sub: "延べ " + num(nLikes) + " 件のありがとう", big: true });
   kpis.push({ label: "もらったコメント 💬", v: num(totCmt), sub: "" });
-  if (hasPV && overallRate != null) kpis.push({ label: "全体スキ率", v: pct(overallRate), sub: ins ? "スキ÷ページビュー" : "スキ÷PV" });
+  if (hasPV && overallRate != null) kpis.push({ label: "全体スキ率", v: pct(overallRate), sub: ins ? "スキ÷ページビュー" : "スキ÷PV", big: true });
   kpis.push({ label: "スキをくれた人", v: num(uniqLikers) + "<small>人</small>", sub: "うちフォロワー " + num(followerLikers) + " 人" });
-  kpis.push({ label: "見込みフォロワー 🌱", v: num(prospects.length) + "<small>人</small>", sub: "未フォローのスキ主さん" });
+  kpis.push({ label: "見込みフォロワー 🌱", v: num(prospects.length) + "<small>人</small>", sub: "未フォローのスキ主さん", big: true });
   /* 旧「ビュー」との違いの説明。noteの画面と数字が違う理由がこれ1つで分かるようにする。 */
   var pvNoteHtml = "";
   if (ins && d.totPVOld != null && ins.pv != null) {
@@ -923,10 +948,16 @@ window.__noteBuildHtml = function (d) {
       refRows + "</table></div></div></div>" +
       '<p class="note">noteの「記事の流入元」と同じデータです（最近28日）。検索エンジンやSNSの名前が上位に来ているほど、note の外から読まれています。<b>どの記事がどこから読まれたか（記事ごとの内訳）と、検索されたキーワードは、noteが出していないので分かりません。</b>そこまで知りたいときは Google Search Console を使ってね。</p>';
   }
-  var kpiHtml = kpis.map(function (k) {
-    return '<div class="kpi"><div class="kpi-label">' + k.label + '</div><div class="kpi-v">' + k.v + "</div>" +
+  /* 主役の数字（big）は大きく上段に、補助の数字は小さく下段に。ひと目で「どこを見るか」が決まるようにする。
+     --i は順番（数字のポップインを少しずつ遅らせる） */
+  function kpiTile(k, i) {
+    return '<div class="kpi' + (k.big ? " big" : "") + '" style="--i:' + i + '"><div class="kpi-label">' + k.label + '</div><div class="kpi-v">' + k.v + "</div>" +
       (k.sub ? '<div class="kpi-sub">' + k.sub + "</div>" : "") + "</div>";
-  }).join("");
+  }
+  var kpiBig = kpis.filter(function (k) { return k.big; });
+  var kpiMini = kpis.filter(function (k) { return !k.big; });
+  var kpiHtml = '<div class="kpis main">' + kpiBig.map(kpiTile).join("") + "</div>" +
+    (kpiMini.length ? '<div class="kpis mini">' + kpiMini.map(kpiTile).join("") + "</div>" : "");
 
   /* ④ 時間帯・曜日 */
   var hourItems = [];
@@ -1269,76 +1300,281 @@ window.__noteBuildHtml = function (d) {
   if (!salesHtml && extraSalesHtml) salesHtml = extraSalesHtml;
 
   var secNo = 0;
-  function secTitle(t, sub) {
+  /* forId を渡すと、見出しそのものが「たたむ/ひらく」のラベルになる（たたみセクション用） */
+  function secTitle(t, sub, forId) {
     secNo++;
-    return '<h2><span class="sec-no">' + secNo + "</span>" + t + "</h2>" + (sub ? '<p class="sec-sub">' + sub + "</p>" : "");
+    var inner = '<span class="sec-no">' + secNo + "</span>" + t;
+    return "<h2>" + (forId ? '<label for="' + forId + '">' + inner + "</label>" : inner) + "</h2>" +
+      (sub ? '<p class="sec-sub">' + sub + "</p>" : "");
   }
 
-  /* ---------- HTML 全体 ---------- */
+  /* ---------- セクションの包み ----------
+     nav  = 上部の目次に出す短い名前（テストや検索で使う正式名とは別の短い言い方にしておく）
+     fold = true なら最初はたたんでおき、見出しと「💡 ひとことまとめ」だけ見せる
+     たたむ/ひらくはチェックボックス＋CSSだけで動く（レポート内のJSはスマホのiframeだと
+     noteのCSPで止まるため、JSは使わない）。目次から飛んできたとき（:target）は自動でひらく。
+     印刷（PDF）のときはCSSで全部ひらく。 */
+  var navItems = [];
+  function section(id, nav, title, sub, body, fold, summary) {
+    navItems.push({ id: id, label: nav });
+    if (!fold) {
+      return '<section class="sec" id="s-' + id + '">' + secTitle(title, sub) +
+        '<div class="sec-body">' + body + "</div></section>";
+    }
+    var cid = "sc-" + id;
+    return '<section class="sec fold" id="s-' + id + '">' +
+      '<input type="checkbox" class="sec-chk" id="' + cid + '">' +
+      secTitle(title, sub, cid) +
+      '<label class="sec-tgl" for="' + cid + '">' +
+      (summary ? '<span class="sec-sum">' + summary + "</span>" : "") +
+      '<span class="sec-btn"><span class="sb-off">くわしく見る ▾</span><span class="sb-on">とじる ▴</span></span></label>' +
+      '<div class="sec-body">' + body + "</div></section>";
+  }
+
+  /* ---------- たたんだセクションの「💡 ひとことまとめ」 ----------
+     ひらかなくても結論が分かるように、各セクションの要点を1行にしておく。 */
+  function wdName(i) { return esc(WD[i] || "?"); }
+  var sumTime = bestC
+    ? "ピークは <b>" + wdName(bestC.wd) + "曜 " + bestC.h + "時台</b>" + (topHours.length ? "・全体では " + esc(topHours[0].key) + "時台が最多" : "")
+    : (topHours.length ? "反応が多いのは <b>" + esc(topHours[0].key) + "時台</b>" : "まだデータが少ないみたい🌱");
+  var dayTot = 0, dayMax = null;
+  dayItems.forEach(function (it) { dayTot += it.v; if (!dayMax || it.v > dayMax.v) dayMax = it; });
+  var sumDaily = "直近30日で <b>" + num(dayTot) + " スキ</b>" +
+    (dayMax && dayMax.v > 0 ? "・いちばん多かった日は " + esc(dayMax.label) + "（" + num(dayMax.v) + "）" : "");
+  var sumHeat = bestC ? "いちばん濃いマスは <b>" + wdName(bestC.wd) + "曜 " + bestC.h + "時台</b>（" + num(bestC.v) + " 件）" : "まだデータが少ないみたい🌱";
+  var sumPHeat = pBest ? "見込みフォロワーが動くのは <b>" + wdName(pBest.wd) + "曜 " + pBest.h + "時台</b>（" + num(pBest.v) + " 件）" : "まだデータが少ないみたい🌱";
+  var topRated = rated.length ? rated.slice().sort(function (a, b) { return b.rate - a.rate; })[0] : null;
+  var topLiked = arts.length ? arts.slice().sort(function (a, b) { return b.like - a.like; })[0] : null;
+  var sumArts = num(nArt) + " 本" + (hasPV && topRated
+    ? "・スキ率トップは「<b>" + esc(topRated.title) + "</b>」" + pct(topRated.rate)
+    : (topLiked ? "・スキ最多は「<b>" + esc(topLiked.title) + "</b>」" + num(topLiked.like) : ""));
+  var rkG = 0, rkM = 0, rkL = 0;
+  rated.forEach(function (a) { if (a.rate >= 20) rkG++; else if (a.rate >= 10) rkM++; else rkL++; });
+  var sumRank = rated.length ? "◎ " + num(rkG) + " 本 / ○ " + num(rkM) + " 本 / △ " + num(rkL) + " 本" : "スキ率を計算できる記事がまだないよ";
+  var sumFans = fans.length
+    ? "トップは <b>" + nickOf(fans[0][0]) + " さん</b>（" + num(fans[0][1]) + " 回）・スキ主 " + num(uniqLikers) + " 人のうちフォロワーは " + num(followerLikers) + " 人"
+    : "まだデータがないよ";
+  var sumPros = prospects.length
+    ? "<b>" + num(prospects.length) + " 人</b>・声かけ優先は " + prospects.slice(0, 3).map(function (p) { return nickOf(p[0]); }).join("・") + " さん"
+    : "まだいないよ。これからの出会いに期待🌱";
+  var sumTags = tagStats.length ? "平均スキ1位は <b>#" + esc(tagStats[0].tag) + "</b>（" + tagStats[0].avg.toFixed(1) + "）" : "タグデータがないよ";
+
+  /* ヒーローに出す「きょうのおすすめ」＝次の一手の1番目。ここだけ読めば今日やることが決まる */
+  var pickHtml = actions.length
+    ? '<div class="hd-pick"><span class="hd-pick-k">きょうのおすすめ</span><span class="hd-pick-v">' + actions[0].icon + " " + actions[0].lead + '</span><a href="#s-act">ぜんぶ見る →</a></div>'
+    : '<div class="hd-pick"><span class="hd-pick-k">きょうのおすすめ</span><span class="hd-pick-v">まずは1本、投稿を続けてみよう🌱</span></div>';
+
+  /* ---------- セクションを表示順に組み立てる（番号と目次はこの順で決まる） ---------- */
+  var h3s = '<h3 style="margin:0 0 10px;font-size:14.5px">';
+  var secs = "";
+  secs += section("act", "🎯 次の一手", "🎯 次の一手 — これ、やってみよう！",
+    "データから見つけた「今すぐできること」。<b>ぜんぶやらなくてOK</b>。気になるものをひとつ選んで、やったら「やった！」を押してみてね。",
+    '<div class="acts">' + actHtml + "</div>" + frogTip("ひとつクリアするだけでも、ちゃんと前進だよ。あばけろ君も応援してる！"), false);
+  secs += section("kpi", "📊 サマリー", "📊 全体サマリー",
+    "上の大きい数字だけ見ればOK。下の小さい数字は「もう少し知りたいとき」用だよ。",
+    kpiHtml + pvNoteHtml, false);
+  /* 流入元（noteの新ダッシュボード由来・コラボ基本版では非表示） */
+  if (!d.liteMode && refHtml) secs += section("ref", "🚪 流入元", "🚪 どこから読まれている？（最近28日）",
+    "noteの外から来たのか、note内で見つけてもらえたのか。記事ごとではなくアカウント全体の数字だよ。", refHtml, false);
+  /* 前回との比較（コラボ基本版では非表示） */
+  if (!d.liteMode) secs += section("diff", "📈 伸びチェック", "📈 前回とくらべて — 伸びチェック",
+    "noteは記事ごとの日別PVを公開していないので、レポートを作るたびに数字を記録して差分を出す方式だよ。", diffHtml, false);
+  /* 有料noteの売上（有料記事・売上がある人のみ／コラボ基本版では非表示） */
+  if (!d.liteMode && salesHtml) secs += section("sales", "💰 売上", "💰 有料noteの売上（直近12か月）",
+    "あなたにだけ見える販売データ。がんばりがお金にもつながってるか、ここでチェック！", salesHtml, false);
+
+  secs += '<div class="chap"><div>🔍 もっとくわしく見る<span>ここから下は「💡 ひとことまとめ」を読むだけでもOK。気になったところだけ開いてね。</span></div></div>';
+  secs += section("time", "💛 時間帯", "💛 スキが集まる時間帯・曜日", "読者さんが反応してくれている時間。ピークのちょっと前が投稿の狙い目！",
+    '<div class="twocol"><div class="card">' + h3s + '🕒 時間帯別（スキ件数）</h3>' + barChart(hourItems, "f-green") + "</div>" +
+    '<div class="card">' + h3s + '📅 曜日別（スキ件数）</h3>' + barChart(wdItems, "f-sun") + "</div></div>", true, sumTime);
+  /* 日別スキ推移（コラボ基本版では非表示） */
+  if (!d.liteMode) secs += section("daily", "📆 日別スキ", "📆 日別スキの推移（最近30日）",
+    "スキが付いた日ごとの件数（スキの時刻から集計）。投稿した日の翌日に山ができていたら、それが「翌日に伸びた」サインだよ。",
+    '<div class="card">' + barChart(dayItems, "f-green", true) + "</div>", true, sumDaily);
+  secs += section("heat", "🔥 曜日×時間", "🔥 曜日 × 時間帯ヒートマップ（スキ全体）", "オレンジが濃いマスほどスキが集中！横スクロールで24時間ぶん見られるよ。",
+    '<div class="card">' + heatTable(heat, SCALE_SUNNY, "hm-all") + "</div>", true, sumHeat);
+  secs += section("pheat", "🌱 見込みの時間", "🌱 見込みフォロワーの活動ヒートマップ", "未来のフォロワーさんだけを抽出。緑が濃い時間帯 = 新しい出会いのチャンスタイム！",
+    '<div class="card">' + heatTable(pHeat, SCALE_SPROUT, "hm-pros") + "</div>", true, sumPHeat);
+  secs += section("arts", "📝 記事別", "📝 記事別エンゲージメント",
+    hasPV ? "スキ率のセル色: 緑=20%以上 / 青=10%以上 / 黄=5%以上 / 赤=5%未満。" + (showImp ? "「ひらかれ率」は 表示 → 開かれた割合＝サムネとタイトルの通信簿。" : "") : "PVデータがないぶん、スキ・コメントでじっくり比較するよ。",
+    '<div class="tblwrap"><table>' + artHead + artRows + "</table></div>", true, sumArts);
+  if (hasPV) secs += section("rank", "🏆 ランキング", "🏆 スキ率ランキング", "「読んだ人のうち何%が押したか」。PVよりも“刺さり度”がわかる指標です。", rankHtml, true, sumRank);
+  secs += section("fans", "💖 常連ファン", "💖 いつもありがとう！常連ファン Top15", "何度もスキをくれる大切な読者さん。活動時間帯に合わせてリアクションを返すと、きっと喜ばれるよ。",
+    '<div class="tblwrap"><table><tr><th class="n">#</th><th>ニックネーム</th><th class="n">スキ回数</th><th class="n">相手のフォロワー数</th><th>活動時間帯</th><th>リンク</th></tr>' + fanRows + "</table></div>", true, sumFans);
+  secs += section("pros", "🌱 見込みの人", "🌱 見込みフォロワー（未フォローのスキ主）全 " + num(prospects.length) + " 人",
+    "もうすぐ仲間になってくれるかも？な読者さんたち。上位20人（クリーム背景）が交流の狙い目、特に上位3人は「声かけ優先」！",
+    '<div class="tblwrap"><table><tr><th class="n">#</th><th>ニックネーム</th><th class="n">スキ回数</th><th class="n">相手のフォロワー数</th><th>活動時間帯</th><th>プロフィール</th></tr>' + prosRows + "</table></div>", true, sumPros);
+  secs += section("tags", "🏷️ タグ", "🏷️ ハッシュタグ別 平均スキ", "どのテーマが喜ばれているか。平均スキが高いタグは「読者が待ってる型」だよ。",
+    '<div class="tblwrap"><table style="min-width:520px"><tr><th>タグ</th><th class="n">記事数</th><th class="n">平均スキ</th><th></th></tr>' + tagRows + "</table></div>", true, sumTags);
+
+  /* 目次ナビ（上に貼り付く）。AI相談枠は本体側（note_analyze_core.js）が末尾に足すので、リンクだけ用意しておく */
+  var navHtml = '<nav class="qnav" aria-label="目次"><div class="qnav-in">' +
+    navItems.map(function (n) { return '<a href="#s-' + n.id + '">' + n.label + "</a>"; }).join("") +
+    '<a href="#noteai-sec">🤖 AIに相談</a></div></nav>';
+
+  /* ---------- HTML 全体 ----------
+     動きはぜんぶCSSだけ（レポート内JSなし）:
+       - 背景の「ふわふわ」はスクロール連動で少しずつ動くパララックス（対応ブラウザのみ。非対応ならただ浮く）
+       - カードはスクロールで下から現れる（animation-timeline:view()。非対応なら最初から見えている）
+       - 棒グラフは伸びる・数字はポップイン
+       - 印刷（PDF）と「視差効果を減らす」設定のときは動きをすべて止め、たたんだ部分も全部ひらく */
   var html = '<!doctype html><html lang="ja"><head><meta charset="utf-8">' +
     '<meta name="viewport" content="width=device-width,initial-scale=1">' +
     "<title>🐸 note わくわく分析レポート @" + esc(d.user || "") + "</title><style>" +
-    ':root{--grn:#17A366;--grn-d:#0E7A4C;--grn-l:#E4F7EC;--sun:#F5A300;--sun-l:#FFF3CF;--coral:#F2694A;--coral-l:#FFE8E1;--sky:#2E97C8;--sky-l:#E2F3FB;--ink:#3B4340;--sub:#7C8580;--line:#EFE7D6;--bg:#FDF9EF;--card:#FFFFFF;--good:#0E7A4C;--good-bg:#DCF5E6;--mid:#1D6FA8;--mid-bg:#E0F0FB;--low:#A16207;--low-bg:#FFF1C9;--bad:#C2402F;--bad-bg:#FFE1DA}' +
+    ':root{--grn:#17A366;--grn-d:#0E7A4C;--grn-l:#E4F7EC;--sun:#F5A300;--sun-l:#FFF3CF;--coral:#F2694A;--coral-l:#FFE8E1;--sky:#2E97C8;--sky-l:#E2F3FB;--ink:#3B4340;--sub:#7C8580;--line:#EFE7D6;--bg:#FDF9EF;--card:#FFFFFF;--good:#0E7A4C;--good-bg:#DCF5E6;--mid:#1D6FA8;--mid-bg:#E0F0FB;--low:#A16207;--low-bg:#FFF1C9;--bad:#C2402F;--bad-bg:#FFE1DA;--shadow:0 3px 10px rgba(120,100,40,.07)}' +
     "*{box-sizing:border-box}" +
-    'body{margin:0;background:var(--bg);color:var(--ink);font-family:"Hiragino Kaku Gothic ProN","Hiragino Sans","Yu Gothic UI","Noto Sans JP",Meiryo,system-ui,sans-serif;font-size:15px;line-height:1.75;-webkit-text-size-adjust:100%}' +
-    ".wrap{max-width:1060px;margin:0 auto;padding:28px 18px 64px}" +
-    "header.hd{position:relative;overflow:hidden;background:linear-gradient(130deg,#14A26A 0%,#2FB984 48%,#4BAFD8 100%);color:#fff;border-radius:26px;padding:30px 28px;margin-bottom:28px;box-shadow:0 6px 20px rgba(23,163,102,.22)}.hd-hero-wrap{max-width:300px;margin:2px auto 10px}.hd-hero{display:block;width:100%;border-radius:18px;filter:drop-shadow(0 6px 10px rgba(0,0,0,.16))}.hd{text-align:center}.hd-meta{justify-content:center}.hd-2col{display:flex;align-items:center;gap:22px;text-align:left;flex-wrap:wrap}.hd-2col .hd-hero-wrap{max-width:230px;margin:0;flex:0 0 auto}.hd-2col .hd-txt{flex:1 1 240px;min-width:200px}.hd-2col .hd-meta{justify-content:flex-start;margin-top:10px}.hd-lead{font-size:21px;font-weight:800;line-height:1.35;margin-bottom:8px}" +
+    "html{background:var(--bg);scroll-behavior:smooth}" +
+    'body{margin:0;background:var(--bg);color:var(--ink);font-family:"Hiragino Kaku Gothic ProN","Hiragino Sans","Yu Gothic UI","Noto Sans JP",Meiryo,system-ui,sans-serif;font-size:15px;line-height:1.75;-webkit-text-size-adjust:100%;isolation:isolate}' +
+    ".wrap{max-width:1060px;margin:0 auto;padding:22px 18px 64px}" +
+    /* アニメーション定義 */
+    "@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-9px)}}" +
+    "@keyframes bob{0%,100%{transform:rotate(8deg) translateY(0)}50%{transform:rotate(1deg) translateY(-9px)}}" +
+    "@keyframes pop{from{opacity:0;transform:scale(.55)}70%{transform:scale(1.06)}to{opacity:1;transform:none}}" +
+    "@keyframes grow{from{transform:scaleX(0)}}" +
+    "@keyframes rise{from{opacity:0;transform:translateY(22px)}to{opacity:1;transform:none}}" +
+    "@keyframes fadein{from{opacity:0;transform:translateY(-4px)}}" +
+    "@keyframes pulse{50%{transform:scale(1.4);box-shadow:0 0 0 7px rgba(23,163,102,.22)}}" +
+    "@keyframes px{to{translate:0 var(--px,-30vh)}}" +
+    "@keyframes hp{to{translate:0 var(--hp,-40px)}}" +
+    /* 背景のふわふわ（固定レイヤー。中身の丸は浮き、外側の箱がスクロールで動く＝パララックス） */
+    ".sky{position:fixed;inset:0;z-index:-1;pointer-events:none;overflow:hidden}" +
+    ".sky i{position:absolute;display:block}" +
+    ".sky i:before{content:'';position:absolute;inset:0;border-radius:50%;background:var(--g);animation:float var(--fd,7s) ease-in-out infinite;animation-delay:var(--fdl,0s)}" +
+    ".sky .b1{width:440px;height:440px;left:-140px;top:-120px;--g:radial-gradient(circle at 45% 45%,#D6F3E2 0%,rgba(214,243,226,0) 70%);--px:-20vh}" +
+    ".sky .b2{width:380px;height:380px;right:-120px;top:18vh;--g:radial-gradient(circle,#FFEDB5 0%,rgba(255,237,181,0) 70%);--px:-70vh;--fd:9s;--fdl:-2s}" +
+    ".sky .b3{width:320px;height:320px;left:8vw;top:85vh;--g:radial-gradient(circle,#FFDCD2 0%,rgba(255,220,210,0) 70%);--px:-120vh;--fd:8s;--fdl:-4s}" +
+    ".sky .b4{width:400px;height:400px;right:6vw;top:140vh;--g:radial-gradient(circle,#D8EFFA 0%,rgba(216,239,250,0) 70%);--px:-160vh;--fd:10s;--fdl:-1s}" +
+    ".sky .b5{width:300px;height:300px;left:40vw;top:200vh;--g:radial-gradient(circle,#E2F6E8 0%,rgba(226,246,232,0) 70%);--px:-210vh;--fd:11s;--fdl:-3s}" +
+    ".sky em{position:absolute;font-style:normal;font-size:24px;opacity:.28}" +
+    ".sky em b{display:inline-block;font-weight:400;animation:float var(--fd,6s) ease-in-out infinite;animation-delay:var(--fdl,0s)}" +
+    ".sky .e1{left:5%;top:38%;--px:-45vh;--fdl:-1s}.sky .e2{right:7%;top:60%;--px:-90vh;--fdl:-2s;font-size:20px}.sky .e3{left:18%;top:120vh;--px:-140vh;--fdl:-3s}.sky .e4{right:22%;top:170vh;--px:-190vh;--fdl:-1.5s;font-size:28px}.sky .e5{left:60%;top:230vh;--px:-240vh;--fdl:-2.6s}" +
+    "@supports (animation-timeline:scroll()){.sky i,.sky em{animation:px linear both;animation-timeline:scroll(root)}}" +
+    /* ヘッダー */
+    "header.hd{position:relative;overflow:hidden;background:linear-gradient(130deg,#14A26A 0%,#2FB984 48%,#4BAFD8 100%);color:#fff;border-radius:26px;padding:30px 28px;margin-bottom:16px;box-shadow:0 6px 20px rgba(23,163,102,.22)}.hd-hero-wrap{max-width:300px;margin:2px auto 10px}.hd-hero{display:block;width:100%;border-radius:18px;filter:drop-shadow(0 6px 10px rgba(0,0,0,.16));animation:float 6s ease-in-out infinite}.hd{text-align:center}.hd-meta{justify-content:center}.hd-2col{display:flex;align-items:center;gap:22px;text-align:left;flex-wrap:wrap}.hd-2col .hd-hero-wrap{max-width:230px;margin:0;flex:0 0 auto}.hd-2col .hd-txt{flex:1 1 240px;min-width:200px}.hd-2col .hd-meta{justify-content:flex-start;margin-top:10px}.hd-lead{font-size:21px;font-weight:800;line-height:1.35;margin-bottom:8px}" +
     "header.hd h1{margin:0 0 6px;font-size:23px;letter-spacing:.02em}" +
     "header.hd .hd-user{font-size:15px;opacity:.97}" +
     "header.hd .hd-meta{margin-top:12px;font-size:12.5px;opacity:.92;display:flex;gap:16px;flex-wrap:wrap}" +
-    "header.hd .hd-frog{position:absolute;right:22px;top:18px;font-size:52px;opacity:.9;transform:rotate(8deg);text-shadow:0 4px 10px rgba(0,0,0,.12)}" +
-    "h2{font-size:18px;margin:42px 0 6px;display:flex;align-items:center;gap:9px}" +
+    "header.hd .hd-frog{position:absolute;right:22px;top:18px;font-size:52px;opacity:.9;transform:rotate(8deg);text-shadow:0 4px 10px rgba(0,0,0,.12);animation:bob 3.4s ease-in-out infinite}" +
+    ".hd .fl{position:absolute;pointer-events:none;font-size:22px;opacity:.85;text-shadow:0 3px 8px rgba(0,0,0,.15);z-index:0}" +
+    ".hd .fl b{display:inline-block;font-weight:400;animation:float 5.5s ease-in-out infinite;animation-delay:var(--fdl,0s)}" +
+    ".hd .fl1{left:3%;top:10%;--fdl:-1s;--hp:-60px}.hd .fl2{left:47%;top:5%;font-size:15px;--fdl:-2.3s;--hp:-90px}.hd .fl3{right:3%;top:12%;font-size:18px;--fdl:-3.1s;--hp:-30px}.hd .fl4{left:22%;bottom:6%;font-size:15px;--fdl:-.6s;--hp:-75px}" +
+    "@supports (animation-timeline:view()){.hd .fl{animation:hp linear both;animation-timeline:view();animation-range:exit 0% exit 100%}}" +
+    ".hd-txt,.hd-hero-wrap{position:relative;z-index:1}" +
+    ".hd-pick{margin-top:14px;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.4);border-radius:16px;padding:10px 14px;font-size:14px;display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;line-height:1.5}" +
+    ".hd-pick-k{background:#fff;color:var(--grn-d);border-radius:999px;padding:2px 10px;font-size:12px;font-weight:800;white-space:nowrap}" +
+    ".hd-pick-v{flex:1 1 200px;font-weight:700}.hd-pick-v b{color:#FFF1B8}" +
+    ".hd-pick a{color:#fff;font-weight:700;white-space:nowrap;text-decoration:none;border-bottom:1.5px solid rgba(255,255,255,.7)}" +
+    /* 目次ナビ（貼り付き） */
+    ".qnav{position:sticky;top:0;z-index:20;margin:0 -18px 18px;padding:8px 18px;background:rgba(253,249,239,.88);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid rgba(239,231,214,.9)}" +
+    ".qnav-in{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;padding:2px 0}" +
+    ".qnav-in::-webkit-scrollbar{display:none}" +
+    ".qnav a{flex:0 0 auto;text-decoration:none;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:999px;padding:5px 11px;font-size:12.5px;font-weight:700;white-space:nowrap;transition:translate .15s,background .15s,color .15s;box-shadow:0 1px 3px rgba(120,100,40,.06)}" +
+    ".qnav a:hover{translate:0 -2px;background:var(--grn-l);color:var(--grn-d);border-color:#BFE8D2}" +
+    "@media (min-width:900px){.qnav-in{flex-wrap:wrap}}" +
+    /* セクション共通・たたみ */
+    ".sec{scroll-margin-top:100px;position:relative}" +
+    "h2{font-size:18px;margin:40px 0 6px;display:flex;align-items:center;gap:9px}" +
+    ".sec:first-of-type h2{margin-top:10px}" +
+    "h2 label{display:flex;align-items:center;gap:9px;cursor:pointer}h2 label:hover{color:var(--grn-d)}" +
     ".sec-no{background:linear-gradient(135deg,var(--grn),#3FBF8C);color:#fff;font-size:12px;border-radius:999px;min-width:24px;height:24px;display:inline-flex;align-items:center;justify-content:center;font-weight:700;box-shadow:0 2px 5px rgba(23,163,102,.3)}" +
+    ".sec:target .sec-no{animation:pulse .8s ease 2}" +
     ".sec-sub{margin:2px 0 14px;color:var(--sub);font-size:13px}" +
-    ".card{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:18px;box-shadow:0 3px 10px rgba(120,100,40,.07)}" +
+    ".act-chk,.why-chk,.sec-chk{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}" +
+    ".sec-tgl{display:flex;flex-wrap:wrap;align-items:center;gap:10px;cursor:pointer;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:10px 14px;box-shadow:var(--shadow);-webkit-user-select:none;user-select:none;transition:translate .15s,box-shadow .15s}" +
+    ".sec-tgl:hover{translate:0 -1px;box-shadow:0 6px 16px rgba(120,100,40,.12)}" +
+    ".sec-sum{flex:1 1 220px;font-size:13.5px;color:var(--ink)}.sec-sum:before{content:'💡 '}.sec-sum b{color:var(--grn-d)}" +
+    ".sec-btn{flex:0 0 auto;font-size:12.5px;font-weight:700;color:var(--grn-d);background:var(--grn-l);border-radius:999px;padding:5px 12px;white-space:nowrap}" +
+    ".sb-on{display:none}" +
+    /* たたみの開閉。チェック＝ひらく。目次から来たとき（:target）は自動でひらき、その状態ではチェックが「とじる」になる */
+    ".fold .sec-body{display:none;margin-top:12px;animation:fadein .3s}" +
+    ".fold .sec-chk:checked ~ .sec-body{display:block}" +
+    ".fold:target .sec-body{display:block}.fold:target .sec-chk:checked ~ .sec-body{display:none}" +
+    ".sec-chk:checked ~ .sec-tgl .sb-off,.fold:target .sec-tgl .sb-off{display:none}" +
+    ".sec-chk:checked ~ .sec-tgl .sb-on,.fold:target .sec-tgl .sb-on{display:inline}" +
+    ".fold:target .sec-chk:checked ~ .sec-tgl .sb-off{display:inline}.fold:target .sec-chk:checked ~ .sec-tgl .sb-on{display:none}" +
+    ".act-chk:focus-visible ~ .act-top .act-tick,.why-chk:focus-visible ~ .why-btn,.sec-chk:focus-visible ~ .sec-tgl{outline:2px solid var(--grn-d);outline-offset:2px}" +
+    ".chap{margin:52px 0 6px;display:flex;align-items:center;gap:14px;font-weight:800;font-size:16px;color:var(--grn-d)}" +
+    ".chap:before,.chap:after{content:'';flex:1;height:2px;background:linear-gradient(90deg,transparent,#CFE9DA,transparent);min-width:20px}" +
+    ".chap span{display:block;font-size:12px;font-weight:600;color:var(--sub)}" +
+    ".card{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:18px;box-shadow:var(--shadow)}" +
     ".frog-tip{display:flex;align-items:flex-start;gap:10px;margin:16px 2px 0}" +
-    ".frog-face{font-size:26px;line-height:1.2}" +
+    ".frog-face{font-size:26px;line-height:1.2;display:inline-block;animation:float 4s ease-in-out infinite}" +
     ".frog-bubble{background:var(--grn-l);border:1.5px solid #BFE8D2;border-radius:16px 16px 16px 4px;padding:8px 14px;font-size:13px;color:#2C5C45}" +
+    /* 次の一手カード */
     ".acts{display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:12px;align-items:start}" +
-    ".act{display:flex;gap:14px;background:var(--card);border:1px solid var(--line);border-radius:18px;padding:15px 17px 15px 22px;box-shadow:0 3px 10px rgba(120,100,40,.07);position:relative;overflow:hidden}" +
+    ".act{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:14px 16px 14px 20px;box-shadow:var(--shadow);position:relative;overflow:hidden;transition:background .25s,border-color .25s}" +
     ".act:before{content:'';position:absolute;left:0;top:0;bottom:0;width:6px}" +
     ".act:nth-child(4n+1):before{background:linear-gradient(180deg,#2FB984,#17A366)}" +
     ".act:nth-child(4n+2):before{background:linear-gradient(180deg,#FFC93C,#F5A300)}" +
     ".act:nth-child(4n+3):before{background:linear-gradient(180deg,#FF8A70,#F2694A)}" +
     ".act:nth-child(4n):before{background:linear-gradient(180deg,#5BC0EB,#2E97C8)}" +
-    ".act-no{flex:0 0 auto;width:32px;height:32px;border-radius:999px;font-weight:700;display:flex;align-items:center;justify-content:center;margin-top:2px;color:#fff;box-shadow:0 2px 5px rgba(0,0,0,.12);background:var(--grn)}" +
+    ".act-top{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:8px}" +
+    ".act-no{flex:0 0 auto;width:28px;height:28px;border-radius:999px;font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:center;color:#fff;box-shadow:0 2px 5px rgba(0,0,0,.12);background:var(--grn);margin-right:2px}" +
     ".act:nth-child(4n+2) .act-no{background:var(--sun)}" +
     ".act:nth-child(4n+3) .act-no{background:var(--coral)}" +
     ".act:nth-child(4n) .act-no{background:var(--sky)}" +
-    ".act-title{font-weight:700;font-size:15.5px;margin-bottom:2px}" +
-    ".act p{margin:0;font-size:14px;color:#4B5450}" +
+    ".chip{display:inline-block;border-radius:999px;padding:2px 9px;font-size:11.5px;font-weight:700;white-space:nowrap;line-height:1.5}" +
+    ".chip.t{background:var(--sun-l);color:#8A6A00}.chip.w{background:var(--sky-l);color:var(--mid)}" +
+    ".act-tick{margin-left:auto;cursor:pointer;border-radius:999px;padding:4px 12px;font-size:12px;font-weight:700;background:#F6F3EA;color:var(--sub);border:1.5px dashed #D9D2C1;transition:background .2s,color .2s,border-color .2s;-webkit-user-select:none;user-select:none;white-space:nowrap}" +
+    ".act-tick:hover{background:var(--grn-l);color:var(--grn-d);border-color:#BFE8D2}" +
+    ".tk-on{display:none}" +
+    ".act-chk:checked ~ .act-top .act-tick{background:var(--grn);color:#fff;border-style:solid;border-color:var(--grn);animation:pop .4s}" +
+    ".act-chk:checked ~ .act-top .tk-off{display:none}.act-chk:checked ~ .act-top .tk-on{display:inline}" +
+    ".act-chk:checked ~ .act-body .act-lead{text-decoration:line-through;color:var(--sub)}" +
+    ".act-chk:checked ~ .act-body .act-lead b{background:none;color:var(--sub)}" +
+    ".act:has(.act-chk:checked){background:linear-gradient(180deg,#F4FBF7,#E8F7EE);border-color:#BFE8D2}" +
+    ".act-title{font-size:12.5px;color:var(--sub);font-weight:700;margin-bottom:3px}" +
+    ".act-lead{margin:0;font-size:16px;font-weight:800;line-height:1.55;color:var(--ink)}" +
+    ".act-lead b{color:var(--grn-d);background:linear-gradient(transparent 62%,#FFF0B3 62%);border-radius:3px}" +
+    ".why-btn{display:inline-block;cursor:pointer;font-size:12.5px;font-weight:700;color:var(--grn-d);background:var(--grn-l);border-radius:999px;padding:3px 11px;margin-top:8px;-webkit-user-select:none;user-select:none;transition:background .15s}" +
+    ".why-btn:hover{background:#D3F0DF}" +
+    ".w-on{display:none}.why-chk:checked ~ .why-btn .w-off{display:none}.why-chk:checked ~ .why-btn .w-on{display:inline}" +
+    ".act-why{display:none;margin:8px 0 0;font-size:13.5px;color:#4B5450;animation:fadein .25s}" +
+    ".why-chk:checked ~ .act-why{display:block}" +
     ".act b{color:var(--grn-d)}" +
+    /* KPI（主役は大きく、補助は小さく） */
     ".kpis{display:flex;flex-wrap:wrap;gap:12px}" +
-    ".kpi{flex:1 1 150px;min-width:140px;background:linear-gradient(180deg,#FFFFFF 0%,#FDFBF4 100%);border:1px solid var(--line);border-radius:18px;padding:14px 16px;box-shadow:0 3px 10px rgba(120,100,40,.07);border-top:4px solid #BFE8D2}" +
+    ".kpi{flex:1 1 150px;min-width:140px;background:linear-gradient(180deg,#FFFFFF 0%,#FDFBF4 100%);border:1px solid var(--line);border-radius:18px;padding:14px 16px;box-shadow:var(--shadow);border-top:4px solid #BFE8D2;transition:translate .15s,box-shadow .15s}" +
+    ".kpi:hover{translate:0 -2px;box-shadow:0 8px 18px rgba(120,100,40,.12)}" +
     ".kpi:nth-child(4n+2){border-top-color:#FFE08A}" +
     ".kpi:nth-child(4n+3){border-top-color:#FFC7B8}" +
     ".kpi:nth-child(4n){border-top-color:#BDE3F5}" +
     ".kpi-label{font-size:12.5px;color:var(--sub)}" +
-    ".kpi-v{font-size:26px;font-weight:700;color:var(--grn-d);line-height:1.3}" +
+    ".kpi-v{font-size:26px;font-weight:700;color:var(--grn-d);line-height:1.3;animation:pop .55s cubic-bezier(.2,.8,.3,1.2) both;animation-delay:calc(var(--i,0)*70ms + .1s)}" +
     ".kpi-v small{font-size:14px;font-weight:600;margin-left:2px}" +
     ".kpi-sub{font-size:11.5px;color:var(--sub);margin-top:2px}" +
+    ".kpis.main .kpi{flex:1 1 200px;padding:18px 20px 16px}" +
+    ".kpis.main .kpi-v{font-size:36px;letter-spacing:-.01em}" +
+    ".kpis.mini{margin-top:10px}" +
+    ".kpis.mini .kpi{flex:1 1 130px;min-width:120px;padding:9px 14px;border-top-width:3px;border-radius:14px}" +
+    ".kpis.mini .kpi-v{font-size:19px}" +
+    ".kpis.mini .kpi-sub{font-size:11px}" +
     ".twocol{display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start}" +
     /* 「1日ごとの伸び」用: 必ず2列以内にして、中のバーを2列に折り返しても細くなりすぎないようにする */
     ".histgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(430px,1fr));gap:16px;align-items:start}" +
     ".twocol>.card{flex:1 1 320px;min-width:280px}" +
+    /* 棒グラフ（左から伸びる。--i は行ごとの順番＝少しずつ遅らせる） */
     ".bars{display:flex;flex-direction:column;gap:4px}" +
     ".bars.split{display:block;column-count:2;column-gap:22px}" +
     ".bars.wide .bar-label{flex:0 0 108px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}" +
     ".bars.split .bar-row{break-inside:avoid;margin-bottom:4px}" +
     ".bar-row{display:flex;align-items:center;gap:8px;font-size:12.5px}" +
+    ".bar-row:hover .bar-val{color:var(--grn-d);font-weight:700}" +
     ".bar-label{flex:0 0 44px;text-align:right;color:var(--sub)}" +
     ".bar-track{flex:1;background:#F4EEDD;border-radius:999px;height:14px;overflow:hidden;display:inline-block}" +
-    ".bar-fill{display:block;height:100%;border-radius:999px}" +
+    ".bar-fill{display:block;height:100%;border-radius:999px;transform-origin:left center;animation:grow .9s cubic-bezier(.2,.7,.2,1) both;animation-delay:calc(var(--i,0)*18ms)}" +
     ".f-green{background:linear-gradient(90deg,#5ED09A,#17A366)}" +
     ".f-sun{background:linear-gradient(90deg,#FFD666,#F5A300)}" +
     ".f-sky{background:linear-gradient(90deg,#7FD0F0,#2E97C8)}" +
     ".f-coral{background:linear-gradient(90deg,#FFA48E,#F2694A)}" +
     ".bar-val{flex:0 0 40px;text-align:right;font-variant-numeric:tabular-nums;color:var(--ink)}" +
+    /* 表 */
     ".tblwrap{overflow-x:auto;border-radius:16px;border:1px solid var(--line);background:var(--card)}" +
     "table{border-collapse:collapse;width:100%;min-width:640px;font-size:13.5px}" +
     "th{background:var(--grn-l);color:#1E5C40;font-weight:700;text-align:left;padding:9px 10px;white-space:nowrap;border-bottom:2px solid #C6EAD6}" +
     "td{padding:8px 10px;border-bottom:1px solid #F3EDDE;vertical-align:top}" +
     "tr:nth-child(even) td{background:#FCFAF2}" +
+    "tr:hover td{background:#F3FAF5}" +
     "th.n,td.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}" +
     "td.ttl{min-width:220px;font-weight:600}" +
     "td.tags{min-width:140px}" +
@@ -1358,7 +1594,8 @@ window.__noteBuildHtml = function (d) {
     ".hm-wd{background:var(--grn-l);min-width:34px}" +
     ".hm-h{background:var(--grn-l);font-weight:600}" +
     ".hm-corner{background:var(--grn-l)}" +
-    "table.hm td{min-width:26px;height:24px;font-variant-numeric:tabular-nums}" +
+    "table.hm td{min-width:26px;height:24px;font-variant-numeric:tabular-nums;transition:transform .12s}" +
+    "table.hm td:hover{transform:scale(1.25);outline:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.18);position:relative;z-index:1}" +
     ".hm-legend{font-size:12px;color:var(--sub);margin:8px 2px 0;display:flex;align-items:center;gap:6px}" +
     ".lg-cells i{display:inline-block;width:18px;height:12px;border-radius:3px;margin-right:2px}" +
     ".fchip{background:var(--good-bg);color:var(--good);border-radius:999px;font-size:10.5px;padding:1px 7px;font-weight:700;white-space:nowrap}" +
@@ -1371,6 +1608,7 @@ window.__noteBuildHtml = function (d) {
     "tr.top3 td{background:#FFF0CE}" +
     ".tg-bar{width:40%;min-width:160px}" +
     ".note{font-size:12px;color:var(--sub);margin:8px 2px}" +
+    /* 名前の伏せ字トグル（売上セクション） */
     ".rv-chk{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}" +
     ".rv-btn{display:inline-block;cursor:pointer;background:var(--sun-l);color:#8A6A00;border:1px solid #F0DFA8;border-radius:999px;padding:5px 14px;font-size:12.5px;font-weight:700;-webkit-user-select:none;user-select:none}" +
     ".rv-chk:focus ~ .rv-btn{outline:2px solid var(--grn-d);outline-offset:2px}" +
@@ -1384,83 +1622,48 @@ window.__noteBuildHtml = function (d) {
     ".empty{color:var(--sub);font-size:13.5px;padding:10px;margin:0}" +
     "footer{margin-top:48px;text-align:center;color:var(--sub);font-size:12px}" +
     "footer .foot-frog{font-size:14px;color:#2C5C45;background:var(--grn-l);display:inline-block;border-radius:999px;padding:6px 18px;margin-bottom:10px}" +
+    /* いちばん上へ */
+    ".totop{position:fixed;right:16px;bottom:18px;z-index:21;text-decoration:none;background:var(--grn);color:#fff;font-weight:700;font-size:13px;border-radius:999px;padding:9px 14px;box-shadow:0 6px 16px rgba(23,163,102,.35);animation:float 4s ease-in-out infinite}" +
+    ".totop:hover{filter:brightness(1.07)}" +
+    /* AI相談枠（本体側が末尾に足す）をレポート本文と同じ幅にそろえる */
+    "body>#noteai-sec{max-width:1060px;margin:0 auto;padding:0 18px 40px}" +
+    /* スクロールで現れる（対応ブラウザのみ。要素が200pxぶん画面に入るまでにふわっと出る） */
+    "@supports (animation-timeline:view()){.act,.kpi,.card,.sec-tgl,.frog-tip,.chap,.tblwrap,.sec-body>.note{animation:rise linear both;animation-timeline:view();animation-range:entry 0% entry 200px}}" +
     "@media (max-width:860px){.bars.split{column-count:1}}" +
-    "@media (max-width:640px){body{font-size:14px}.wrap{padding:16px 10px 48px}header.hd{padding:20px 16px}header.hd .hd-frog{font-size:36px;right:12px;top:12px}.kpi{flex:1 1 44%;min-width:120px}.kpi-v{font-size:22px}h2{font-size:16.5px}}" +
+    "@media (max-width:640px){body{font-size:14px}.wrap{padding:12px 10px 48px}header.hd{padding:20px 16px}header.hd .hd-frog{font-size:36px;right:12px;top:12px}.hd .fl2,.hd .fl3,.hd .fl4{display:none}.hd-pick{font-size:13px}.qnav{margin:0 -10px 14px;padding:7px 10px}.qnav a{padding:5px 10px;font-size:12px}.kpi{flex:1 1 44%;min-width:120px}.kpi-v{font-size:22px}.kpis.main .kpi{flex:1 1 44%;padding:14px 14px 12px}.kpis.main .kpi-v{font-size:28px}.kpis.mini .kpi{flex:1 1 30%;min-width:100px}h2{font-size:16.5px}.act-lead{font-size:15px}.acts{grid-template-columns:1fr}.totop{padding:8px 12px;font-size:12px;right:12px;bottom:14px}body>#noteai-sec{padding:0 10px 32px}}" +
+    /* 動きを減らす設定の人には止める */
+    "@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*::before,*::after{animation:none!important;transition:none!important}}" +
+    /* 印刷（PDF）: 動きを止め、たたんだ部分と根拠を全部ひらき、飾りは消す */
     "@media print{body{background:#fff}.card,.act,.kpi,.tblwrap{box-shadow:none;break-inside:avoid}header.hd{-webkit-print-color-adjust:exact;print-color-adjust:exact}*{-webkit-print-color-adjust:exact;print-color-adjust:exact}h2{break-after:avoid}" +
+    "*,*::before,*::after{animation:none!important;transition:none!important}.sky,.qnav,.totop,.hd .fl,.act-tick,.why-btn,.sec-btn,.hd-pick a{display:none!important}.fold .sec-body,.act-why{display:block!important}.sec-tgl{box-shadow:none}" +
     ".tblwrap{overflow-x:visible}table{min-width:0!important;width:100%;font-size:11px}th,td{padding:5px 6px}th{white-space:normal}tr{break-inside:avoid}td{overflow-wrap:break-word}td.ttl,td.tags{min-width:0}.tag{font-size:10px;padding:1px 6px}" +
     "table.hm{font-size:9.5px}table.hm th,table.hm td{padding:2px 1px}table.hm td{min-width:0;height:18px}.tg-bar{min-width:100px}}" +
-    "</style></head><body><div class='wrap'>" +
+    "</style></head><body>" +
+
+    /* 背景のふわふわ（スクロールで少しずつ動く。印刷では出さない） */
+    '<div class="sky" aria-hidden="true"><i class="b1"></i><i class="b2"></i><i class="b3"></i><i class="b4"></i><i class="b5"></i>' +
+    '<em class="e1"><b>💛</b></em><em class="e2"><b>🌱</b></em><em class="e3"><b>✨</b></em><em class="e4"><b>💬</b></em><em class="e5"><b>🐸</b></em></div>' +
+    "<div class='wrap' id='top'>" +
 
     /* ① ヘッダー */
-    '<header class="hd hd-2col">' + (d.heroImg ? '<div class="hd-hero-wrap"><img class="hd-hero" src="' + d.heroImg + '" alt="note わくわく分析レポート"></div>' : '<span class="hd-frog">🐸</span><h1>🌱 note わくわく分析レポート</h1>') +
+    '<header class="hd hd-2col">' +
+    '<span class="fl fl1" aria-hidden="true"><b>💛</b></span><span class="fl fl2" aria-hidden="true"><b>✨</b></span><span class="fl fl3" aria-hidden="true"><b>🌱</b></span><span class="fl fl4" aria-hidden="true"><b>💬</b></span>' +
+    (d.heroImg ? '<div class="hd-hero-wrap"><img class="hd-hero" src="' + d.heroImg + '" alt="note わくわく分析レポート"></div>' : '<span class="hd-frog">🐸</span><h1>🌱 note わくわく分析レポート</h1>') +
     '<div class="hd-txt"><div class="hd-lead">あなたのnote、まるっと見える化！🐸</div><div class="hd-user">@' + esc(d.user || "") + ' さんのがんばりが、ぜんぶ数字で見えるよ！</div>' +
     '<div class="hd-meta"><span>レポートができた日: ' + esc(genAt) + "</span>" +
     (hasPV ? "<span>PV集計時点: " + esc(meta.last || "&minus;") + "</span>" : "<span>PVデータなし（スキ・コメントで楽しく分析）</span>") +
-    "<span>がんばって書いた記事: " + num(nArt) + " 本</span></div></div></header>" +
+    "<span>がんばって書いた記事: " + num(nArt) + " 本</span></div>" +
+    pickHtml + "</div></header>" +
 
-    /* ② 次の一手 */
-    secTitle("🎯 次の一手 — これ、やってみよう！", "データから見つけた「今すぐできること」リスト。ぜんぶやらなくてOK、気になるものからひとつずつ。") +
-    '<div class="acts">' + actHtml + "</div>" +
-    frogTip("ひとつクリアするだけでも、ちゃんと前進だよ。あばけろ君も応援してる！") +
+    /* 目次ナビ */
+    navHtml +
 
-    /* ③ KPI */
-    secTitle("📊 全体サマリー", "まずはいまの成績をひとめでチェック！") +
-    '<div class="kpis">' + kpiHtml + "</div>" + pvNoteHtml +
-
-    /* ③a 流入元（noteの新ダッシュボード由来・コラボ基本版では非表示） */
-    (d.liteMode || !refHtml ? "" :
-      secTitle("🚪 どこから読まれている？（最近28日）", "noteの外から来たのか、note内で見つけてもらえたのか。記事ごとではなくアカウント全体の数字だよ。") +
-      refHtml) +
-
-    /* ③b 前回との比較（コラボ基本版では非表示） */
-    (d.liteMode ? "" :
-      secTitle("📈 前回とくらべて — 伸びチェック", "noteは記事ごとの日別PVを公開していないので、レポートを作るたびに数字を記録して差分を出す方式だよ。") +
-      diffHtml) +
-
-    /* ③c 有料noteの売上（有料記事・売上がある人のみ／コラボ基本版では非表示） */
-    (d.liteMode || !salesHtml ? "" :
-      secTitle("💰 有料noteの売上（直近12か月）", "あなたにだけ見える販売データ。がんばりがお金にもつながってるか、ここでチェック！") +
-      salesHtml) +
-
-    /* ④ 時間帯・曜日 */
-    secTitle("💛 スキが集まる時間帯・曜日", "読者さんが反応してくれている時間。ピークのちょっと前が投稿の狙い目！") +
-    '<div class="twocol"><div class="card"><h3 style="margin:0 0 10px;font-size:14.5px">🕒 時間帯別（スキ件数）</h3>' + barChart(hourItems, "f-green") + "</div>" +
-    '<div class="card"><h3 style="margin:0 0 10px;font-size:14.5px">📅 曜日別（スキ件数）</h3>' + barChart(wdItems, "f-sun") + "</div></div>" +
-
-    /* ④b 日別スキ推移（コラボ基本版では非表示） */
-    (d.liteMode ? "" :
-      secTitle("📆 日別スキの推移（最近30日）", "スキが付いた日ごとの件数（スキの時刻から集計）。投稿した日の翌日に山ができていたら、それが「翌日に伸びた」サインだよ。") +
-      '<div class="card">' + barChart(dayItems, "f-green", true) + "</div>") +
-
-    /* ⑤ ヒートマップ（全体） */
-    secTitle("🔥 曜日 × 時間帯ヒートマップ（スキ全体）", "オレンジが濃いマスほどスキが集中！横スクロールで24時間ぶん見られるよ。") +
-    '<div class="card">' + heatTable(heat, SCALE_SUNNY, "hm-all") + "</div>" +
-
-    /* ⑥ ヒートマップ（見込み客） */
-    secTitle("🌱 見込みフォロワーの活動ヒートマップ", "未来のフォロワーさんだけを抽出。緑が濃い時間帯 = 新しい出会いのチャンスタイム！") +
-    '<div class="card">' + heatTable(pHeat, SCALE_SPROUT, "hm-pros") + "</div>" +
-
-    /* ⑦ 記事別 */
-    secTitle("📝 記事別エンゲージメント", hasPV ? "スキ率のセル色: 緑=20%以上 / 青=10%以上 / 黄=5%以上 / 赤=5%未満。" + (showImp ? "「ひらかれ率」は 表示 → 開かれた割合＝サムネとタイトルの通信簿。" : "") : "PVデータがないぶん、スキ・コメントでじっくり比較するよ。") +
-    '<div class="tblwrap"><table>' + artHead + artRows + "</table></div>" +
-
-    /* ⑧ スキ率ランキング（hasPVのみ） */
-    (hasPV ? secTitle("🏆 スキ率ランキング", "「読んだ人のうち何%が押したか」。PVよりも“刺さり度”がわかる指標です。") + rankHtml : "") +
-
-    /* ⑨ 常連ファン */
-    secTitle("💖 いつもありがとう！常連ファン Top15", "何度もスキをくれる大切な読者さん。活動時間帯に合わせてリアクションを返すと、きっと喜ばれるよ。") +
-    '<div class="tblwrap"><table><tr><th class="n">#</th><th>ニックネーム</th><th class="n">スキ回数</th><th class="n">相手のフォロワー数</th><th>活動時間帯</th><th>リンク</th></tr>' + fanRows + "</table></div>" +
-
-    /* ⑩ 見込みフォロワー */
-    secTitle("🌱 見込みフォロワー（未フォローのスキ主）全 " + num(prospects.length) + " 人", "もうすぐ仲間になってくれるかも？な読者さんたち。上位20人（クリーム背景）が交流の狙い目、特に上位3人は「声かけ優先」！") +
-    '<div class="tblwrap"><table><tr><th class="n">#</th><th>ニックネーム</th><th class="n">スキ回数</th><th class="n">相手のフォロワー数</th><th>活動時間帯</th><th>プロフィール</th></tr>' + prosRows + "</table></div>" +
-
-    /* ⑪ タグ別 */
-    secTitle("🏷️ ハッシュタグ別 平均スキ", "どのテーマが喜ばれているか。平均スキが高いタグは「読者が待ってる型」だよ。") +
-    '<div class="tblwrap"><table style="min-width:520px"><tr><th>タグ</th><th class="n">記事数</th><th class="n">平均スキ</th><th></th></tr>' + tagRows + "</table></div>" +
+    /* ②〜 各セクション（番号つき） */
+    secs +
 
     '<footer><div class="foot-frog">今日もおつかれさま🐸 数字は励みに、比較はほどほどに。</div><br>このレポートは @' + esc(d.user || "") + " のnote活動データから自動生成されました。" +
     (d.credit ? "<br>" + esc(d.credit) : "") + "</footer>" +
+    '<a class="totop" href="#top" aria-label="いちばん上へ">🐸 上へ</a>' +
     "</div></body></html>";
 
   return html;
